@@ -115,6 +115,10 @@ export function seekAndPlay(time: number): void {
   void player.play()
 }
 
+export function pausePlayer(): void {
+  player?.pause()
+}
+
 /** Draw cue markers on the Video.js progress control. */
 export function updateMarkers(cues: Cue[]): void {
   if (!player) return

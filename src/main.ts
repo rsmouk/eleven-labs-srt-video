@@ -9,6 +9,7 @@ import {
   getDuration,
   getPlayer,
   initPlayer,
+  pausePlayer,
   seekAndPlay,
   updateMarkers,
 } from './player'
@@ -107,6 +108,7 @@ async function mountPlayer() {
 function addCueAtCurrent() {
   if (!videoUrl || !getPlayer()) return
   const start = getCurrentTime()
+  pausePlayer()
   const duration = getDuration()
   const end = Math.min(start + 3, duration > 0 ? duration : start + 3)
   const id = uid()
