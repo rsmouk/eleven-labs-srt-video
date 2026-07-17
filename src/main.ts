@@ -3,6 +3,16 @@ import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
 import { synthesizeSpeech } from './elevenlabs'
 import { t } from './i18n'
+import {
+  disposePlayer,
+  getCurrentTime,
+  getDuration,
+  getPlayer,
+  initPlayer,
+  seekAndPlay,
+  updateMarkers,
+} from './player'
+import { isSpeechSupported, startDictation } from './speech'
 import { loadLang, loadSettings, saveLang, saveSettings } from './storage'
 import { cuesToSrt, formatClock, formatFileTimestamp, parseTimeInput, uid } from './time'
 import type { Cue, ElevenSettings, Lang } from './types'
@@ -17,6 +27,8 @@ let videoName = ''
 let cues: Cue[] = []
 let toastTimer = 0
 let deferredPrompt: BeforeInstallPromptEvent | null = null
+let stopDictation: (() => void) | null = null
+let listeningCueId: string | null = null
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -26,7 +38,7 @@ interface BeforeInstallPromptEvent extends Event {
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault()
   deferredPrompt = e as BeforeInstallPromptEvent
-  render()
+  updateChromeTexts()
 })
 
 function applyDir() {
@@ -51,37 +63,66 @@ function revokeCueAudio(cue: Cue) {
   if (cue.audioUrl) URL.revokeObjectURL(cue.audioUrl)
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+
 function setVideoFile(file: File) {
   if (videoUrl) URL.revokeObjectURL(videoUrl)
   cues.forEach(revokeCueAudio)
   cues = []
+  disposePlayer()
   videoUrl = URL.createObjectURL(file)
   videoName = file.name.replace(/\.[^.]+$/, '') || 'video'
-  render()
+  showWorkspace()
+  void mountPlayer()
+  refreshCues()
 }
 
-function getVideo(): HTMLVideoElement | null {
-  return document.getElementById('player') as HTMLVideoElement | null
+async function mountPlayer() {
+  if (!videoUrl) return
+  const host = document.getElementById('player-host')
+  if (!host) return
+
+  host.innerHTML = `
+    <video
+      id="player"
+      class="video-js vjs-big-play-centered vjs-fluid"
+      playsinline
+    ></video>
+  `
+  const videoEl = document.getElementById('player') as HTMLVideoElement
+  const player = await initPlayer(videoEl, videoUrl)
+  player.ready(() => {
+    updateMarkers(cues)
+    player.on('loadedmetadata', () => updateMarkers(cues))
+  })
 }
 
 function addCueAtCurrent() {
-  const video = getVideo()
-  if (!video || !videoUrl) return
-  const start = video.currentTime
-  const end = Math.min(start + 3, Number.isFinite(video.duration) ? video.duration : start + 3)
+  if (!videoUrl || !getPlayer()) return
+  const start = getCurrentTime()
+  const duration = getDuration()
+  const end = Math.min(start + 3, duration > 0 ? duration : start + 3)
+  const id = uid()
   cues = [
     ...cues,
     {
-      id: uid(),
+      id,
       start,
       end: end > start ? end : start + 0.5,
       text: '',
     },
   ].sort((a, b) => a.start - b.start)
-  render()
+
+  refreshCues()
+  updateMarkers(cues)
   window.requestAnimationFrame(() => {
-    const last = document.querySelector<HTMLTextAreaElement>(`textarea[data-cue="${cues[cues.length - 1]?.id}"]`)
-    last?.focus()
+    document.querySelector<HTMLTextAreaElement>(`textarea[data-cue="${id}"]`)?.focus()
   })
 }
 
@@ -90,10 +131,58 @@ function updateCue(id: string, patch: Partial<Cue>) {
 }
 
 function removeCue(id: string) {
+  if (listeningCueId === id) stopActiveDictation()
   const cue = cues.find((c) => c.id === id)
   if (cue) revokeCueAudio(cue)
   cues = cues.filter((c) => c.id !== id)
-  render()
+  refreshCues()
+  updateMarkers(cues)
+}
+
+function stopActiveDictation() {
+  stopDictation?.()
+  stopDictation = null
+  listeningCueId = null
+}
+
+function toggleDictation(id: string) {
+  if (!isSpeechSupported()) {
+    showToast(t(lang, 'voiceUnsupported'))
+    return
+  }
+
+  if (listeningCueId === id) {
+    stopActiveDictation()
+    refreshCues()
+    return
+  }
+
+  stopActiveDictation()
+  listeningCueId = id
+  refreshCues()
+
+  const base = cues.find((c) => c.id === id)?.text ?? ''
+  const prefix = base.trim() ? `${base.trim()} ` : ''
+
+  stopDictation = startDictation(
+    lang,
+    (partial) => {
+      updateCue(id, { text: `${prefix}${partial}`.trim() })
+      const ta = document.querySelector<HTMLTextAreaElement>(`textarea[data-cue="${id}"]`)
+      if (ta) ta.value = cues.find((c) => c.id === id)?.text ?? ''
+    },
+    (finalText) => {
+      updateCue(id, { text: `${prefix}${finalText}`.trim() })
+    },
+    () => {
+      listeningCueId = null
+      stopDictation = null
+      refreshCues()
+    },
+    (code) => {
+      showToast(code === 'unsupported' ? t(lang, 'voiceUnsupported') : t(lang, 'voiceError'))
+    },
+  )
 }
 
 async function generateOne(id: string) {
@@ -106,11 +195,12 @@ async function generateOne(id: string) {
   if (!cue || !cue.text.trim()) return
 
   updateCue(id, { generating: true })
-  renderCuesOnly()
+  refreshCues()
 
   try {
     const blob = await synthesizeSpeech(cue.text, settings)
-    revokeCueAudio(cue)
+    const current = cues.find((c) => c.id === id)
+    if (current) revokeCueAudio(current)
     const audioUrl = URL.createObjectURL(blob)
     updateCue(id, { generating: false, audioBlob: blob, audioUrl })
     showToast(t(lang, 'doneAudio'))
@@ -118,7 +208,7 @@ async function generateOne(id: string) {
     updateCue(id, { generating: false })
     showToast(`${t(lang, 'errorAudio')}: ${err instanceof Error ? err.message : String(err)}`)
   }
-  renderCuesOnly()
+  refreshCues()
 }
 
 async function generateAll() {
@@ -142,8 +232,7 @@ function downloadSrt() {
     showToast(t(lang, 'needCues'))
     return
   }
-  const content = cuesToSrt(cues)
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+  const blob = new Blob([cuesToSrt(cues)], { type: 'text/plain;charset=utf-8' })
   saveAs(blob, `${videoName || 'captions'}.srt`)
 }
 
@@ -156,8 +245,7 @@ async function downloadAudioZip() {
   const zip = new JSZip()
   const sorted = [...withAudio].sort((a, b) => a.start - b.start)
   sorted.forEach((c, i) => {
-    const name = `${String(i + 1).padStart(3, '0')}_${formatFileTimestamp(c.start)}.mp3`
-    zip.file(name, c.audioBlob!)
+    zip.file(`${String(i + 1).padStart(3, '0')}_${formatFileTimestamp(c.start)}.mp3`, c.audioBlob!)
   })
   const timing = sorted
     .map(
@@ -166,8 +254,7 @@ async function downloadAudioZip() {
     )
     .join('\n')
   zip.file('timing.txt', `index\tstart\tend\ttext\n${timing}\n`)
-  const blob = await zip.generateAsync({ type: 'blob' })
-  saveAs(blob, `${videoName || 'narration'}_audio.zip`)
+  saveAs(await zip.generateAsync({ type: 'blob' }), `${videoName || 'narration'}_audio.zip`)
 }
 
 function openSettings() {
@@ -183,10 +270,11 @@ function closeSettings() {
 }
 
 function persistSettingsFromForm() {
-  const apiKey = (document.getElementById('set-api') as HTMLInputElement).value
-  const voiceId = (document.getElementById('set-voice') as HTMLInputElement).value
-  const modelId = (document.getElementById('set-model') as HTMLInputElement).value
-  settings = { apiKey, voiceId, modelId }
+  settings = {
+    apiKey: (document.getElementById('set-api') as HTMLInputElement).value,
+    voiceId: (document.getElementById('set-voice') as HTMLInputElement).value,
+    modelId: (document.getElementById('set-model') as HTMLInputElement).value,
+  }
   saveSettings(settings)
   showToast(t(lang, 'saved'))
   closeSettings()
@@ -197,64 +285,71 @@ async function installPwa() {
   await deferredPrompt.prompt()
   await deferredPrompt.userChoice
   deferredPrompt = null
-  render()
-}
-
-function renderCuesOnly() {
-  const list = document.getElementById('cues-list')
-  if (!list) return
-  list.innerHTML = cuesHtml()
-  bindCueEvents(list)
+  updateChromeTexts()
 }
 
 function cuesHtml(): string {
   if (!cues.length) {
-    return `<p class="rounded-2xl border border-dashed border-sand bg-white/40 px-4 py-8 text-center text-sm text-ink/55">${t(lang, 'emptyCues')}</p>`
+    return `<div class="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-500">${t(lang, 'emptyCues')}</div>`
   }
 
   return cues
-    .map(
-      (c) => `
-      <article class="animate-rise rounded-2xl border border-sand/80 bg-white/70 p-4 shadow-[0_8px_30px_-18px_rgba(28,43,38,0.35)] backdrop-blur-sm" data-id="${c.id}">
+    .map((c) => {
+      const listening = listeningCueId === c.id
+      return `
+      <article class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm" data-id="${c.id}">
         <div class="mb-3 flex flex-wrap items-end gap-3">
-          <label class="flex min-w-[7rem] flex-1 flex-col gap-1 text-xs font-medium text-ink/60">
+          <label class="flex min-w-[7rem] flex-1 flex-col gap-1 text-xs font-medium text-slate-600">
             ${t(lang, 'start')}
-            <input data-field="start" value="${formatClock(c.start)}" class="rounded-xl border border-sand bg-mist/80 px-3 py-2 text-sm text-ink" />
+            <input data-field="start" value="${formatClock(c.start)}" class="rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
           </label>
-          <label class="flex min-w-[7rem] flex-1 flex-col gap-1 text-xs font-medium text-ink/60">
+          <label class="flex min-w-[7rem] flex-1 flex-col gap-1 text-xs font-medium text-slate-600">
             ${t(lang, 'end')}
-            <input data-field="end" value="${formatClock(c.end)}" class="rounded-xl border border-sand bg-mist/80 px-3 py-2 text-sm text-ink" />
+            <input data-field="end" value="${formatClock(c.end)}" class="rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
           </label>
           <div class="flex flex-wrap gap-2">
-            <button type="button" data-action="seek" class="rounded-xl border border-sand bg-white px-3 py-2 text-xs font-semibold text-leaf-deep hover:bg-fog">${formatClock(c.start)}</button>
-            <button type="button" data-action="generate" class="rounded-xl bg-leaf px-3 py-2 text-xs font-semibold text-white hover:bg-leaf-deep disabled:opacity-50" ${c.generating ? 'disabled' : ''}>
+            <button type="button" data-action="seek" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">${formatClock(c.start)}</button>
+            <button type="button" data-action="generate" class="rounded-md bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50" ${c.generating ? 'disabled' : ''}>
               ${c.generating ? t(lang, 'generating') : t(lang, 'generate')}
             </button>
             ${
               c.audioUrl
-                ? `<button type="button" data-action="play-audio" class="rounded-xl border border-leaf/30 bg-fog px-3 py-2 text-xs font-semibold text-leaf-deep">${t(lang, 'playAudio')}</button>`
+                ? `<button type="button" data-action="play-audio" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'playAudio')}</button>`
                 : ''
             }
-            <button type="button" data-action="delete" class="rounded-xl border border-transparent px-3 py-2 text-xs font-semibold text-warn hover:bg-warn/10">${t(lang, 'delete')}</button>
+            <button type="button" data-action="delete" class="rounded-md px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50">${t(lang, 'delete')}</button>
           </div>
         </div>
-        <label class="flex flex-col gap-1 text-xs font-medium text-ink/60">
-          ${t(lang, 'text')}
-          <textarea data-cue="${c.id}" data-field="text" rows="2" placeholder="${t(lang, 'cuePlaceholder')}" class="w-full resize-y rounded-xl border border-sand bg-mist/60 px-3 py-2 text-sm leading-relaxed text-ink placeholder:text-ink/35">${escapeHtml(c.text)}</textarea>
-        </label>
+
+        <div class="flex flex-col gap-1">
+          <span class="text-xs font-medium text-slate-600">${t(lang, 'text')}</span>
+          <div class="flex items-start gap-2">
+            <textarea data-cue="${c.id}" data-field="text" rows="2" placeholder="${t(lang, 'cuePlaceholder')}" class="min-w-0 flex-1 resize-y rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">${escapeHtml(c.text)}</textarea>
+            <button
+              type="button"
+              data-action="dictate"
+              title="${t(lang, 'voiceInput')}"
+              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 ${listening ? 'listening' : ''}"
+              aria-pressed="${listening ? 'true' : 'false'}"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5" aria-hidden="true">
+                <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 0-2 0 3 3 0 1 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V18H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 11Z"/>
+              </svg>
+              <span class="sr-only">${listening ? t(lang, 'voiceListening') : t(lang, 'voiceInput')}</span>
+            </button>
+          </div>
+        </div>
         ${c.audioUrl ? `<audio class="mt-3 w-full" controls src="${c.audioUrl}"></audio>` : ''}
-      </article>
-    `,
-    )
+      </article>`
+    })
     .join('')
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
+function refreshCues() {
+  const list = document.getElementById('cues-list')
+  if (!list) return
+  list.innerHTML = cuesHtml()
+  bindCueEvents(list)
 }
 
 function bindCueEvents(list: HTMLElement) {
@@ -269,7 +364,10 @@ function bindCueEvents(list: HTMLElement) {
         }
         const parsed = parseTimeInput(input.value)
         if (parsed == null) return
-        if (field === 'start') updateCue(id, { start: parsed })
+        if (field === 'start') {
+          updateCue(id, { start: parsed })
+          updateMarkers(cues)
+        }
         if (field === 'end') updateCue(id, { end: parsed })
       }
       input.addEventListener('change', commit)
@@ -284,99 +382,130 @@ function bindCueEvents(list: HTMLElement) {
 
     card.querySelector('[data-action="generate"]')?.addEventListener('click', () => void generateOne(id))
     card.querySelector('[data-action="delete"]')?.addEventListener('click', () => removeCue(id))
+    card.querySelector('[data-action="dictate"]')?.addEventListener('click', () => toggleDictation(id))
     card.querySelector('[data-action="seek"]')?.addEventListener('click', () => {
-      const video = getVideo()
       const cue = cues.find((c) => c.id === id)
-      if (video && cue) {
-        video.currentTime = cue.start
-        void video.play()
-      }
+      if (cue) seekAndPlay(cue.start)
     })
     card.querySelector('[data-action="play-audio"]')?.addEventListener('click', () => {
-      const audio = card.querySelector('audio')
-      void audio?.play()
+      void card.querySelector('audio')?.play()
     })
   })
 }
 
-function render() {
-  applyDir()
-  const hasVideo = Boolean(videoUrl)
+function updateChromeTexts() {
+  const map: Array<[string, string]> = [
+    ['txt-brand', t(lang, 'brand')],
+    ['txt-tagline', t(lang, 'tagline')],
+    ['btn-lang', t(lang, 'lang')],
+    ['btn-settings', t(lang, 'settings')],
+    ['txt-upload-title', t(lang, 'uploadTitle')],
+    ['txt-upload-hint', t(lang, 'uploadHint')],
+    ['txt-choose', t(lang, 'chooseVideo')],
+    ['txt-change', t(lang, 'changeVideo')],
+    ['btn-add-cue', t(lang, 'addCue')],
+    ['btn-gen-all', t(lang, 'generateAll')],
+    ['btn-dl-srt', t(lang, 'downloadSrt')],
+    ['btn-dl-audio', t(lang, 'downloadAudio')],
+    ['txt-time-hint', t(lang, 'timeHint')],
+    ['txt-cues-title', t(lang, 'cues')],
+    ['txt-settings-title', t(lang, 'settingsTitle')],
+    ['txt-settings-hint', t(lang, 'settingsHint')],
+    ['lbl-api', t(lang, 'apiKey')],
+    ['lbl-voice', t(lang, 'voiceId')],
+    ['lbl-model', t(lang, 'modelId')],
+    ['btn-close-settings', t(lang, 'close')],
+    ['btn-save-settings', t(lang, 'save')],
+  ]
+  for (const [id, text] of map) {
+    const el = document.getElementById(id)
+    if (el) el.textContent = text
+  }
+  const install = document.getElementById('btn-install')
+  if (install) {
+    install.textContent = t(lang, 'installPwa')
+    install.classList.toggle('hidden', !deferredPrompt)
+  }
+  refreshCues()
+}
 
+function showWorkspace() {
+  document.getElementById('upload-panel')?.classList.add('hidden')
+  document.getElementById('workspace')?.classList.remove('hidden')
+}
+
+function showUpload() {
+  document.getElementById('upload-panel')?.classList.remove('hidden')
+  document.getElementById('workspace')?.classList.add('hidden')
+}
+
+function renderShell() {
+  applyDir()
   root.innerHTML = `
-    <div class="mx-auto flex min-h-dvh max-w-5xl flex-col px-4 pb-16 pt-4 sm:px-6">
-      <header class="animate-rise mb-8 flex items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/55 px-4 py-3 shadow-[0_10px_40px_-24px_rgba(28,43,38,0.45)] backdrop-blur-md">
-        <div class="min-w-0">
-          <p class="font-display text-xl font-semibold tracking-tight text-leaf-deep sm:text-2xl">${t(lang, 'brand')}</p>
-          <p class="truncate text-xs text-ink/50 sm:text-sm">${t(lang, 'tagline')}</p>
-        </div>
-        <div class="flex shrink-0 items-center gap-2">
-          ${
-            deferredPrompt
-              ? `<button type="button" id="btn-install" class="hidden rounded-xl border border-sand bg-fog px-3 py-2 text-xs font-semibold text-leaf-deep sm:inline-flex">${t(lang, 'installPwa')}</button>`
-              : ''
-          }
-          <button type="button" id="btn-lang" class="rounded-xl border border-sand bg-white px-3 py-2 text-xs font-semibold text-ink/80 hover:bg-mist">${t(lang, 'lang')}</button>
-          <button type="button" id="btn-settings" class="rounded-xl bg-leaf px-3 py-2 text-xs font-semibold text-white hover:bg-leaf-deep">${t(lang, 'settings')}</button>
+    <div class="min-h-dvh">
+      <header class="border-b border-slate-200 bg-white">
+        <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div class="min-w-0">
+            <p id="txt-brand" class="text-lg font-semibold tracking-tight text-slate-900">${t(lang, 'brand')}</p>
+            <p id="txt-tagline" class="truncate text-sm text-slate-500">${t(lang, 'tagline')}</p>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <button type="button" id="btn-install" class="hidden rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:inline-flex">${t(lang, 'installPwa')}</button>
+            <button type="button" id="btn-lang" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'lang')}</button>
+            <button type="button" id="btn-settings" class="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">${t(lang, 'settings')}</button>
+          </div>
         </div>
       </header>
 
-      ${
-        !hasVideo
-          ? `
-        <section id="dropzone" class="animate-rise flex flex-1 flex-col items-center justify-center rounded-[2rem] border border-dashed border-leaf/25 bg-white/45 px-6 py-16 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-          <div class="mb-4 h-14 w-14 rounded-full bg-fog animate-pulse-soft"></div>
-          <h1 class="font-display text-3xl font-medium text-ink sm:text-4xl">${t(lang, 'uploadTitle')}</h1>
-          <p class="mt-3 max-w-md text-sm leading-relaxed text-ink/55">${t(lang, 'uploadHint')}</p>
-          <label class="mt-8 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-leaf px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-leaf/20 hover:bg-leaf-deep">
-            ${t(lang, 'chooseVideo')}
-            <input id="file-input" type="file" accept="video/*" class="hidden" />
+      <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        <section id="upload-panel" class="${videoUrl ? 'hidden' : ''} rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-sm">
+          <h1 id="txt-upload-title" class="text-2xl font-semibold text-slate-900">${t(lang, 'uploadTitle')}</h1>
+          <p id="txt-upload-hint" class="mx-auto mt-2 max-w-lg text-sm text-slate-500">${t(lang, 'uploadHint')}</p>
+          <label class="mt-6 inline-flex cursor-pointer items-center rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700">
+            <span id="txt-choose">${t(lang, 'chooseVideo')}</span>
+            <input id="file-input-upload" type="file" accept="video/*" class="hidden" />
           </label>
         </section>
-      `
-          : `
-        <section class="animate-rise space-y-6">
-          <div class="video-shell overflow-hidden rounded-[1.75rem] border border-sand/80 bg-ink shadow-[0_20px_50px_-28px_rgba(28,43,38,0.55)]">
-            <video id="player" src="${videoUrl}" controls playsinline class="block"></video>
-          </div>
+
+        <section id="workspace" class="${videoUrl ? '' : 'hidden'} space-y-6">
+          <div id="player-host" class="overflow-hidden rounded-xl border border-slate-200 bg-black shadow-sm"></div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <label class="inline-flex cursor-pointer items-center rounded-xl border border-sand bg-white px-3 py-2 text-xs font-semibold text-ink/70 hover:bg-mist">
-              ${t(lang, 'changeVideo')}
-              <input id="file-input" type="file" accept="video/*" class="hidden" />
+            <label class="inline-flex cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <span id="txt-change">${t(lang, 'changeVideo')}</span>
+              <input id="file-input-change" type="file" accept="video/*" class="hidden" />
             </label>
-            <button type="button" id="btn-add-cue" class="rounded-xl bg-leaf px-4 py-2 text-xs font-semibold text-white hover:bg-leaf-deep">${t(lang, 'addCue')}</button>
-            <button type="button" id="btn-gen-all" class="rounded-xl border border-leaf/30 bg-fog px-4 py-2 text-xs font-semibold text-leaf-deep hover:bg-sand/60">${t(lang, 'generateAll')}</button>
-            <button type="button" id="btn-dl-srt" class="rounded-xl border border-sand bg-white px-4 py-2 text-xs font-semibold text-ink/80 hover:bg-mist">${t(lang, 'downloadSrt')}</button>
-            <button type="button" id="btn-dl-audio" class="rounded-xl border border-sand bg-white px-4 py-2 text-xs font-semibold text-ink/80 hover:bg-mist">${t(lang, 'downloadAudio')}</button>
+            <button type="button" id="btn-add-cue" class="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">${t(lang, 'addCue')}</button>
+            <button type="button" id="btn-gen-all" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'generateAll')}</button>
+            <button type="button" id="btn-dl-srt" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'downloadSrt')}</button>
+            <button type="button" id="btn-dl-audio" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'downloadAudio')}</button>
           </div>
-          <p class="text-xs text-ink/45">${t(lang, 'timeHint')}</p>
+          <p id="txt-time-hint" class="text-sm text-slate-500">${t(lang, 'timeHint')}</p>
 
           <div>
-            <h2 class="mb-3 font-display text-xl font-medium text-ink">${t(lang, 'cues')}</h2>
-            <div id="cues-list" class="space-y-3">${cuesHtml()}</div>
+            <h2 id="txt-cues-title" class="mb-3 text-lg font-semibold text-slate-900">${t(lang, 'cues')}</h2>
+            <div id="cues-list" class="space-y-3"></div>
           </div>
         </section>
-      `
-      }
+      </main>
 
       <div id="settings-modal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
-        <div id="settings-backdrop" class="absolute inset-0 bg-ink/35 backdrop-blur-[2px]"></div>
-        <div class="relative mx-auto mt-[10vh] max-w-md rounded-3xl border border-white/80 bg-mist p-6 shadow-2xl">
-          <h2 class="font-display text-2xl font-medium text-ink">${t(lang, 'settingsTitle')}</h2>
-          <p class="mt-1 text-sm text-ink/50">${t(lang, 'settingsHint')}</p>
+        <div id="settings-backdrop" class="absolute inset-0 bg-slate-900/40"></div>
+        <div class="relative mx-auto mt-[12vh] max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
+          <h2 id="txt-settings-title" class="text-lg font-semibold text-slate-900">${t(lang, 'settingsTitle')}</h2>
+          <p id="txt-settings-hint" class="mt-1 text-sm text-slate-500">${t(lang, 'settingsHint')}</p>
           <form id="settings-form" class="mt-5 space-y-4">
-            <label class="block text-xs font-semibold text-ink/60">
-              ${t(lang, 'apiKey')}
-              <input id="set-api" type="password" autocomplete="off" value="${escapeHtml(settings.apiKey)}" class="mt-1 w-full rounded-xl border border-sand bg-white px-3 py-2.5 text-sm" />
+            <label class="block text-sm font-medium text-slate-700">
+              <span id="lbl-api">${t(lang, 'apiKey')}</span>
+              <input id="set-api" type="password" autocomplete="off" value="${escapeHtml(settings.apiKey)}" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
             </label>
-            <label class="block text-xs font-semibold text-ink/60">
-              ${t(lang, 'voiceId')}
-              <input id="set-voice" type="text" value="${escapeHtml(settings.voiceId)}" class="mt-1 w-full rounded-xl border border-sand bg-white px-3 py-2.5 text-sm" placeholder="e.g. 21m00Tcm4TlvDq8ikWAM" />
+            <label class="block text-sm font-medium text-slate-700">
+              <span id="lbl-voice">${t(lang, 'voiceId')}</span>
+              <input id="set-voice" type="text" value="${escapeHtml(settings.voiceId)}" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="e.g. 21m00Tcm4TlvDq8ikWAM" />
             </label>
-            <label class="block text-xs font-semibold text-ink/60">
-              ${t(lang, 'modelId')}
-              <select id="set-model" class="mt-1 w-full rounded-xl border border-sand bg-white px-3 py-2.5 text-sm">
+            <label class="block text-sm font-medium text-slate-700">
+              <span id="lbl-model">${t(lang, 'modelId')}</span>
+              <select id="set-model" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 <option value="eleven_multilingual_v2" ${settings.modelId === 'eleven_multilingual_v2' ? 'selected' : ''}>eleven_multilingual_v2</option>
                 <option value="eleven_turbo_v2_5" ${settings.modelId === 'eleven_turbo_v2_5' ? 'selected' : ''}>eleven_turbo_v2_5</option>
                 <option value="eleven_flash_v2_5" ${settings.modelId === 'eleven_flash_v2_5' ? 'selected' : ''}>eleven_flash_v2_5</option>
@@ -384,27 +513,34 @@ function render() {
               </select>
             </label>
             <div class="flex justify-end gap-2 pt-2">
-              <button type="button" id="btn-close-settings" class="rounded-xl border border-sand bg-white px-4 py-2 text-sm font-semibold text-ink/70">${t(lang, 'close')}</button>
-              <button type="submit" class="rounded-xl bg-leaf px-4 py-2 text-sm font-semibold text-white hover:bg-leaf-deep">${t(lang, 'save')}</button>
+              <button type="button" id="btn-close-settings" class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'close')}</button>
+              <button type="submit" id="btn-save-settings" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">${t(lang, 'save')}</button>
             </div>
           </form>
         </div>
       </div>
 
-      <div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-white opacity-0 shadow-lg transition-opacity duration-300"></div>
+      <div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white opacity-0 shadow-lg transition-opacity duration-300"></div>
     </div>
   `
 
-  bindGlobalEvents()
-  const list = document.getElementById('cues-list')
-  if (list) bindCueEvents(list)
+  bindShellEvents()
+  refreshCues()
+
+  if (videoUrl) {
+    showWorkspace()
+    void mountPlayer()
+  } else {
+    showUpload()
+  }
 }
 
-function bindGlobalEvents() {
+function bindShellEvents() {
   document.getElementById('btn-lang')?.addEventListener('click', () => {
     lang = lang === 'en' ? 'ar' : 'en'
     saveLang(lang)
-    render()
+    applyDir()
+    updateChromeTexts()
   })
   document.getElementById('btn-settings')?.addEventListener('click', openSettings)
   document.getElementById('btn-close-settings')?.addEventListener('click', closeSettings)
@@ -415,29 +551,32 @@ function bindGlobalEvents() {
   })
   document.getElementById('btn-install')?.addEventListener('click', () => void installPwa())
 
-  const fileInput = document.getElementById('file-input') as HTMLInputElement | null
-  fileInput?.addEventListener('change', () => {
-    const file = fileInput.files?.[0]
-    if (file) setVideoFile(file)
-  })
+  const onFile = (input: HTMLInputElement | null) => {
+    input?.addEventListener('change', () => {
+      const file = input.files?.[0]
+      if (file) setVideoFile(file)
+      input.value = ''
+    })
+  }
+  onFile(document.getElementById('file-input-upload') as HTMLInputElement | null)
+  onFile(document.getElementById('file-input-change') as HTMLInputElement | null)
 
-  const dropzone = document.getElementById('dropzone')
+  const dropzone = document.getElementById('upload-panel')
   if (dropzone) {
     ;['dragenter', 'dragover'].forEach((ev) => {
       dropzone.addEventListener(ev, (e) => {
         e.preventDefault()
-        dropzone.classList.add('ring-2', 'ring-leaf/40')
+        dropzone.classList.add('ring-2', 'ring-blue-500')
       })
     })
     ;['dragleave', 'drop'].forEach((ev) => {
       dropzone.addEventListener(ev, (e) => {
         e.preventDefault()
-        dropzone.classList.remove('ring-2', 'ring-leaf/40')
+        dropzone.classList.remove('ring-2', 'ring-blue-500')
       })
     })
     dropzone.addEventListener('drop', (e) => {
-      const dt = (e as DragEvent).dataTransfer
-      const file = dt?.files?.[0]
+      const file = (e as DragEvent).dataTransfer?.files?.[0]
       if (file?.type.startsWith('video/')) setVideoFile(file)
     })
   }
@@ -448,7 +587,7 @@ function bindGlobalEvents() {
   document.getElementById('btn-dl-audio')?.addEventListener('click', () => void downloadAudioZip())
 }
 
-render()
+renderShell()
 
 if ('serviceWorker' in navigator) {
   void import('virtual:pwa-register').then(({ registerSW }) => {

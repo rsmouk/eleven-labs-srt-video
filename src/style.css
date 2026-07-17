@@ -1,77 +1,61 @@
 @import 'tailwindcss';
-
-@theme {
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
-  --color-ink: #1c2b26;
-  --color-mist: #f4f7f5;
-  --color-fog: #e6eeea;
-  --color-leaf: #3d6b5e;
-  --color-leaf-deep: #2a4f45;
-  --color-sand: #d8e4de;
-  --color-warn: #9a5b3c;
-}
+@import 'video.js/dist/video-js.css';
 
 @layer base {
-  html {
-    @apply scroll-smooth;
-  }
-
   body {
-    @apply m-0 min-h-dvh font-sans text-ink antialiased;
-    background:
-      radial-gradient(1200px 600px at 10% -10%, #dcebe4 0%, transparent 55%),
-      radial-gradient(900px 500px at 100% 0%, #e8efe8 0%, transparent 50%),
-      linear-gradient(180deg, #f7faf8 0%, #eef3f0 100%);
-  }
-
-  button,
-  input,
-  textarea,
-  select {
-    @apply font-sans;
-  }
-
-  :focus-visible {
-    @apply outline-2 outline-offset-2 outline-leaf;
+    @apply m-0 min-h-dvh bg-slate-50 font-sans text-slate-900 antialiased;
   }
 }
 
-@layer utilities {
-  .font-display {
-    font-family: var(--font-display);
-  }
+.video-js {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  max-height: min(58vh, 560px);
 }
 
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.vjs-marker {
+  position: absolute;
+  bottom: 0;
+  width: 3px;
+  height: 100%;
+  margin-left: -1.5px;
+  background: #f59e0b;
+  border-radius: 1px;
+  pointer-events: auto;
+  z-index: 2;
+  cursor: pointer;
 }
 
-@keyframes soft-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
+.vjs-marker:hover {
+  background: #fbbf24;
+  width: 4px;
+  margin-left: -2px;
 }
 
-.animate-rise {
-  animation: rise-in 0.45s ease-out both;
+.vjs-marker-tip {
+  display: none;
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgb(15 23 42 / 0.92);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.3;
+  padding: 4px 8px;
+  border-radius: 6px;
+  pointer-events: none;
 }
 
-.animate-pulse-soft {
-  animation: soft-pulse 2.2s ease-in-out infinite;
+.vjs-marker:hover .vjs-marker-tip {
+  display: block;
 }
 
-.video-shell video {
-  @apply max-h-[min(58vh,520px)] w-full bg-ink/90 object-contain;
+.listening {
+  @apply animate-pulse bg-red-600 text-white ring-2 ring-red-300;
 }
