@@ -43,6 +43,7 @@ const dict = {
     voiceUnsupported: 'Speech recognition is not supported in this browser. Try Chrome.',
     voiceListening: 'Listening…',
     voiceError: 'Could not start microphone dictation',
+    clearText: 'Clear text',
   },
   ar: {
     brand: 'Narrate',
@@ -86,6 +87,7 @@ const dict = {
     voiceUnsupported: 'التعرّف على الكلام غير مدعوم في هذا المتصفح. جرّب Chrome.',
     voiceListening: 'يستمع…',
     voiceError: 'تعذّر بدء الإملاء بالميكروفون',
+    clearText: 'مسح النص',
   },
 } as const
 

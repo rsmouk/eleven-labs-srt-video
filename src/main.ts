@@ -332,18 +332,31 @@ function cuesHtml(): string {
           <span class="text-xs font-medium text-slate-600">${t(lang, 'text')}</span>
           <div class="flex items-start gap-2">
             <textarea data-cue="${c.id}" data-field="text" rows="2" placeholder="${t(lang, 'cuePlaceholder')}" class="min-w-0 flex-1 resize-y rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">${escapeHtml(c.text)}</textarea>
-            <button
-              type="button"
-              data-action="dictate"
-              title="${t(lang, 'voiceInput')}"
-              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 ${listening ? 'listening' : ''}"
-              aria-pressed="${listening ? 'true' : 'false'}"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5" aria-hidden="true">
-                <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 0-2 0 3 3 0 1 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V18H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 11Z"/>
-              </svg>
-              <span class="sr-only">${listening ? t(lang, 'voiceListening') : t(lang, 'voiceInput')}</span>
-            </button>
+            <div class="flex shrink-0 flex-col gap-2">
+              <button
+                type="button"
+                data-action="dictate"
+                title="${t(lang, 'voiceInput')}"
+                class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 ${listening ? 'listening' : ''}"
+                aria-pressed="${listening ? 'true' : 'false'}"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5" aria-hidden="true">
+                  <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 0-2 0 3 3 0 1 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V18H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 11Z"/>
+                </svg>
+                <span class="sr-only">${listening ? t(lang, 'voiceListening') : t(lang, 'voiceInput')}</span>
+              </button>
+              <button
+                type="button"
+                data-action="clear-text"
+                title="${t(lang, 'clearText')}"
+                class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 hover:bg-red-50 hover:text-red-600"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 12a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-12M10 11v6M14 11v6"/>
+                </svg>
+                <span class="sr-only">${t(lang, 'clearText')}</span>
+              </button>
+            </div>
           </div>
         </div>
         ${c.audioUrl ? `<audio class="mt-3 w-full" controls src="${c.audioUrl}"></audio>` : ''}
@@ -390,6 +403,16 @@ function bindCueEvents(list: HTMLElement) {
     card.querySelector('[data-action="generate"]')?.addEventListener('click', () => void generateOne(id))
     card.querySelector('[data-action="delete"]')?.addEventListener('click', () => removeCue(id))
     card.querySelector('[data-action="dictate"]')?.addEventListener('click', () => toggleDictation(id))
+    card.querySelector('[data-action="clear-text"]')?.addEventListener('click', () => {
+      if (listeningCueId === id) stopActiveDictation()
+      updateCue(id, { text: '' })
+      const ta = card.querySelector<HTMLTextAreaElement>(`textarea[data-cue="${id}"]`)
+      if (ta) {
+        ta.value = ''
+        ta.focus()
+      }
+      refreshCues()
+    })
     card.querySelector('[data-action="seek"]')?.addEventListener('click', () => {
       const cue = cues.find((c) => c.id === id)
       if (cue) seekAndPlay(cue.start)
