@@ -370,6 +370,7 @@ function refreshCues() {
   if (!list) return
   list.innerHTML = cuesHtml()
   bindCueEvents(list)
+  updateStickyState()
 }
 
 function bindCueEvents(list: HTMLElement) {
@@ -433,10 +434,10 @@ function updateChromeTexts() {
     ['txt-upload-hint', t(lang, 'uploadHint')],
     ['txt-choose', t(lang, 'chooseVideo')],
     ['txt-change', t(lang, 'changeVideo')],
-    ['btn-add-cue', t(lang, 'addCue')],
-    ['btn-gen-all', t(lang, 'generateAll')],
-    ['btn-dl-srt', t(lang, 'downloadSrt')],
-    ['btn-dl-audio', t(lang, 'downloadAudio')],
+    ['txt-add-cue', t(lang, 'addCue')],
+    ['txt-gen-all', t(lang, 'generateAll')],
+    ['txt-dl-srt', t(lang, 'downloadSrt')],
+    ['txt-dl-audio', t(lang, 'downloadAudio')],
     ['txt-time-hint', t(lang, 'timeHint')],
     ['txt-cues-title', t(lang, 'cues')],
     ['txt-settings-title', t(lang, 'settingsTitle')],
@@ -451,12 +452,33 @@ function updateChromeTexts() {
     const el = document.getElementById(id)
     if (el) el.textContent = text
   }
+
+  const titleMap: Array<[string, string]> = [
+    ['btn-add-cue', t(lang, 'addCue')],
+    ['btn-gen-all', t(lang, 'generateAll')],
+    ['btn-dl-srt', t(lang, 'downloadSrt')],
+    ['btn-dl-audio', t(lang, 'downloadAudio')],
+    ['btn-change-wrap', t(lang, 'changeVideo')],
+  ]
+  for (const [id, text] of titleMap) {
+    document.getElementById(id)?.setAttribute('title', text)
+  }
+
   const install = document.getElementById('btn-install')
   if (install) {
     install.textContent = t(lang, 'installPwa')
     install.classList.toggle('hidden', !deferredPrompt)
   }
   refreshCues()
+  updateStickyState()
+}
+
+function updateStickyState() {
+  const panel = document.getElementById('video-panel')
+  if (!panel) return
+  // Sticky whenever captions exist (desktop + mobile); always sticky on mobile with video loaded
+  const shouldStick = Boolean(videoUrl) && (cues.length > 0 || window.matchMedia('(max-width: 1023px)').matches)
+  panel.classList.toggle('video-sticky-panel', shouldStick)
 }
 
 function showWorkspace() {
@@ -487,7 +509,7 @@ function renderShell() {
         </div>
       </header>
 
-      <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <main class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:py-6">
         <section id="upload-panel" class="${videoUrl ? 'hidden' : ''} rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-sm">
           <h1 id="txt-upload-title" class="text-2xl font-semibold text-slate-900">${t(lang, 'uploadTitle')}</h1>
           <p id="txt-upload-hint" class="mx-auto mt-2 max-w-lg text-sm text-slate-500">${t(lang, 'uploadHint')}</p>
@@ -497,24 +519,56 @@ function renderShell() {
           </label>
         </section>
 
-        <section id="workspace" class="${videoUrl ? '' : 'hidden'} space-y-6">
-          <div id="player-host" class="mx-auto rounded-xl border border-slate-200 bg-slate-900 shadow-sm"></div>
+        <section id="workspace" class="${videoUrl ? '' : 'hidden'}">
+          <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 lg:items-start">
+            <div id="video-panel" class="space-y-2 border-b border-slate-200 pb-2 lg:border-b-0 lg:pb-0">
+              <div id="player-host" class="overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-sm"></div>
 
-          <div class="flex flex-wrap items-center gap-2">
-            <label class="inline-flex cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-              <span id="txt-change">${t(lang, 'changeVideo')}</span>
-              <input id="file-input-change" type="file" accept="video/*" class="hidden" />
-            </label>
-            <button type="button" id="btn-add-cue" class="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">${t(lang, 'addCue')}</button>
-            <button type="button" id="btn-gen-all" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'generateAll')}</button>
-            <button type="button" id="btn-dl-srt" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'downloadSrt')}</button>
-            <button type="button" id="btn-dl-audio" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'downloadAudio')}</button>
-          </div>
-          <p id="txt-time-hint" class="text-sm text-slate-500">${t(lang, 'timeHint')}</p>
+              <div id="workspace-toolbar" class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2 py-2 shadow-sm lg:justify-start lg:px-3">
+                <label id="btn-change-wrap" title="${t(lang, 'changeVideo')}" class="toolbar-icon-btn cursor-pointer lg:inline-flex lg:w-auto lg:gap-2 lg:px-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14M4 8h8a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4a2 2 0 012-2z"/>
+                  </svg>
+                  <span id="txt-change" class="hidden text-sm font-medium lg:inline">${t(lang, 'changeVideo')}</span>
+                  <input id="file-input-change" type="file" accept="video/*" class="hidden" />
+                </label>
 
-          <div>
-            <h2 id="txt-cues-title" class="mb-3 text-lg font-semibold text-slate-900">${t(lang, 'cues')}</h2>
-            <div id="cues-list" class="space-y-3"></div>
+                <button type="button" id="btn-add-cue" title="${t(lang, 'addCue')}" class="toolbar-icon-btn-primary lg:inline-flex lg:w-auto lg:gap-2 lg:px-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
+                  </svg>
+                  <span id="txt-add-cue" class="hidden text-sm font-medium lg:inline">${t(lang, 'addCue')}</span>
+                </button>
+
+                <button type="button" id="btn-gen-all" title="${t(lang, 'generateAll')}" class="toolbar-icon-btn lg:inline-flex lg:w-auto lg:gap-2 lg:px-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V9l12-2v10M9 19c0 1.1-1.3 2-3 2s-3-.9-3-2 1.3-2 3-2 3 .9 3 2zm12-2c0 1.1-1.3 2-3 2s-3-.9-3-2 1.3-2 3-2 3 .9 3 2z"/>
+                  </svg>
+                  <span id="txt-gen-all" class="hidden text-sm font-medium lg:inline">${t(lang, 'generateAll')}</span>
+                </button>
+
+                <button type="button" id="btn-dl-srt" title="${t(lang, 'downloadSrt')}" class="toolbar-icon-btn lg:inline-flex lg:w-auto lg:gap-2 lg:px-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M7 4h7l3 3v13a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z"/>
+                  </svg>
+                  <span id="txt-dl-srt" class="hidden text-sm font-medium lg:inline">${t(lang, 'downloadSrt')}</span>
+                </button>
+
+                <button type="button" id="btn-dl-audio" title="${t(lang, 'downloadAudio')}" class="toolbar-icon-btn lg:inline-flex lg:w-auto lg:gap-2 lg:px-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4"/>
+                  </svg>
+                  <span id="txt-dl-audio" class="hidden text-sm font-medium lg:inline">${t(lang, 'downloadAudio')}</span>
+                </button>
+              </div>
+
+              <p id="txt-time-hint" class="hidden text-xs text-slate-500 lg:block">${t(lang, 'timeHint')}</p>
+            </div>
+
+            <div class="min-w-0">
+              <h2 id="txt-cues-title" class="mb-3 text-lg font-semibold text-slate-900">${t(lang, 'cues')}</h2>
+              <div id="cues-list" class="space-y-3 pb-8"></div>
+            </div>
           </div>
         </section>
       </main>
@@ -556,6 +610,9 @@ function renderShell() {
 
   bindShellEvents()
   refreshCues()
+  window.addEventListener('resize', () => {
+    updateStickyState()
+  })
 
   if (videoUrl) {
     showWorkspace()

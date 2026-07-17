@@ -74,12 +74,15 @@ export function fitPlayerLayout(p: Player = player!): void {
 
   const portrait = vh > vw
   const width = host.clientWidth || el.parentElement?.clientWidth || window.innerWidth
-  const maxH = Math.min(window.innerHeight * 0.55, portrait ? 520 : 480)
+  const isDesktop = window.matchMedia('(min-width: 1024px)').matches
+  const maxH = isDesktop
+    ? Math.min(window.innerHeight * 0.62, portrait ? 560 : 480)
+    : Math.min(window.innerHeight * 0.38, portrait ? 360 : 280)
 
   // Height from natural ratio at full width, then cap
   let height = (width * vh) / vw
   if (height > maxH) height = maxH
-  height = Math.max(Math.round(height), 200)
+  height = Math.max(Math.round(height), isDesktop ? 200 : 160)
 
   p.dimensions(width, height)
   el.style.width = '100%'

@@ -44,6 +44,11 @@ const dict = {
     voiceListening: 'Listening…',
     voiceError: 'Could not start microphone dictation',
     clearText: 'Clear text',
+    addCueShort: 'Add cue',
+    genAllShort: 'Generate',
+    srtShort: 'SRT',
+    audioShort: 'Audio',
+    changeShort: 'Video',
   },
   ar: {
     brand: 'Narrate',
@@ -88,6 +93,11 @@ const dict = {
     voiceListening: 'يستمع…',
     voiceError: 'تعذّر بدء الإملاء بالميكروفون',
     clearText: 'مسح النص',
+    addCueShort: 'إضافة',
+    genAllShort: 'توليد',
+    srtShort: 'SRT',
+    audioShort: 'صوت',
+    changeShort: 'فيديو',
   },
 } as const
 

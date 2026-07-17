@@ -48,6 +48,30 @@
   visibility: visible !important;
 }
 
+/* Sticky video column (desktop) / sticky top stack (mobile) */
+.video-sticky-panel {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #f8fafc;
+}
+
+@media (min-width: 1024px) {
+  .video-sticky-panel {
+    top: 1rem;
+    align-self: start;
+    max-height: calc(100vh - 2rem);
+  }
+}
+
+.toolbar-icon-btn {
+  @apply inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50;
+}
+
+.toolbar-icon-btn-primary {
+  @apply inline-flex h-10 w-10 items-center justify-center rounded-md bg-blue-600 text-white shadow-sm hover:bg-blue-700;
+}
+
 .vjs-marker {
   position: absolute;
   bottom: 0;
