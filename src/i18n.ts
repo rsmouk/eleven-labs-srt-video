@@ -52,6 +52,7 @@ const dict = {
     male: 'Male',
     female: 'Female',
     selectVoice: 'Select a free voice',
+    setStartNow: 'Fix start time',
   },
   ar: {
     brand: 'Narrate',
@@ -104,6 +105,7 @@ const dict = {
     male: 'ذكر',
     female: 'أنثى',
     selectVoice: 'اختر صوتًا مجانيًا',
+    setStartNow: 'تصحيح وقت البداية',
   },
 } as const
 

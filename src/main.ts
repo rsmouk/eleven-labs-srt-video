@@ -344,6 +344,7 @@ function cuesHtml(): string {
           </label>
           <div class="flex flex-wrap gap-2">
             <button type="button" data-action="seek" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">${formatClock(c.start)}</button>
+            <button type="button" data-action="set-start-now" title="${t(lang, 'setStartNow')}" class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100">${t(lang, 'setStartNow')}</button>
             <button type="button" data-action="generate" class="rounded-md bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50" ${c.generating ? 'disabled' : ''}>
               ${c.generating ? t(lang, 'generating') : t(lang, 'generate')}
             </button>
@@ -430,6 +431,16 @@ function bindCueEvents(list: HTMLElement) {
 
     card.querySelector('[data-action="generate"]')?.addEventListener('click', () => void generateOne(id))
     card.querySelector('[data-action="delete"]')?.addEventListener('click', () => removeCue(id))
+    card.querySelector('[data-action="set-start-now"]')?.addEventListener('click', () => {
+      if (!getPlayer()) return
+      const start = getCurrentTime()
+      const cue = cues.find((c) => c.id === id)
+      const end = cue && cue.end > start ? cue.end : start + 3
+      updateCue(id, { start, end })
+      cues = [...cues].sort((a, b) => a.start - b.start)
+      updateMarkers(cues)
+      refreshCues()
+    })
     card.querySelector('[data-action="dictate"]')?.addEventListener('click', () => toggleDictation(id))
     card.querySelector('[data-action="clear-text"]')?.addEventListener('click', () => {
       if (listeningCueId === id) stopActiveDictation()
