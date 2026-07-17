@@ -12,30 +12,31 @@
   justify-content: center;
   align-items: center;
   width: 100%;
-  max-height: min(70vh, 560px);
+  min-height: 200px;
   background: #0f172a;
+  overflow: visible;
 }
 
 #player-host .video-js {
+  position: relative;
   width: 100%;
   max-width: 100%;
-  max-height: min(70vh, 560px);
-  height: auto !important;
+  background: #000;
+  font-size: 12px;
 }
 
-/* Landscape / default */
 #player-host.is-landscape .video-js {
-  aspect-ratio: 16 / 9;
   max-width: min(100%, 900px);
-  max-height: min(52vh, 480px);
 }
 
-/* Story / portrait */
 #player-host.is-portrait .video-js {
-  aspect-ratio: 9 / 16;
-  width: auto;
   max-width: min(100%, 360px);
-  max-height: min(68vh, 560px);
+}
+
+@media (max-width: 640px) {
+  #player-host.is-portrait .video-js {
+    max-width: min(100%, 300px);
+  }
 }
 
 #player-host .video-js .vjs-tech {
@@ -44,29 +45,27 @@
   height: 100%;
 }
 
-/* Keep control bar always visible */
+/* Keep control bar pinned inside the player */
 #player-host .video-js .vjs-control-bar {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 3em !important;
   opacity: 1 !important;
   visibility: visible !important;
   display: flex !important;
   transform: none !important;
   transition: none !important;
+  z-index: 20 !important;
 }
 
-#player-host .video-js.vjs-user-inactive .vjs-control-bar {
+#player-host .video-js.vjs-user-inactive .vjs-control-bar,
+#player-host .video-js.vjs-has-started.vjs-user-inactive .vjs-control-bar {
   opacity: 1 !important;
   visibility: visible !important;
-}
-
-@media (max-width: 640px) {
-  #player-host.is-portrait .video-js {
-    max-width: min(100%, 300px);
-    max-height: min(62vh, 480px);
-  }
-
-  #player-host.is-landscape .video-js {
-    max-height: min(42vh, 360px);
-  }
+  display: flex !important;
 }
 
 .vjs-marker {

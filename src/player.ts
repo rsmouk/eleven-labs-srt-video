@@ -76,22 +76,32 @@ export function fitPlayerLayout(p: Player = player!): void {
   host.classList.toggle('is-portrait', portrait)
   host.classList.toggle('is-landscape', !portrait)
 
-  const ratio = `${w}:${h}`
-  p.aspectRatio(ratio)
-
-  // Cap height so stories stay moderate on large screens
   const maxH = portrait
-    ? Math.min(window.innerHeight * 0.68, 560)
-    : Math.min(window.innerHeight * 0.52, 480)
-  const maxW = portrait ? Math.min(host.clientWidth || 360, 360) : host.clientWidth || 900
-  const heightFromWidth = (maxW * h) / w
-  const widthFromHeight = (maxH * w) / h
+    ? Math.min(window.innerHeight * 0.62, 520)
+    : Math.min(window.innerHeight * 0.48, 440)
+  const maxW = portrait
+    ? Math.min(host.clientWidth || 360, 360)
+    : Math.min(host.clientWidth || 900, 900)
 
+  const heightFromWidth = (maxW * h) / w
+  let width: number
+  let height: number
   if (heightFromWidth <= maxH) {
-    p.dimensions(Math.round(maxW), Math.round(heightFromWidth))
+    width = maxW
+    height = heightFromWidth
   } else {
-    p.dimensions(Math.round(widthFromHeight), Math.round(maxH))
+    width = (maxH * w) / h
+    height = maxH
   }
+
+  // Ensure minimum height so the control bar stays inside the player box
+  height = Math.max(height, 180)
+
+  p.aspectRatio(`${w}:${h}`)
+  p.dimensions(Math.round(width), Math.round(height))
+  el.style.width = `${Math.round(width)}px`
+  el.style.height = `${Math.round(height)}px`
+  el.style.maxWidth = '100%'
 }
 
 function guessMime(src: string): string {
