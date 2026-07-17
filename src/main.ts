@@ -88,10 +88,11 @@ async function mountPlayer() {
   const host = document.getElementById('player-host')
   if (!host) return
 
+  host.classList.remove('is-portrait', 'is-landscape')
   host.innerHTML = `
     <video
       id="player"
-      class="video-js vjs-big-play-centered vjs-fluid"
+      class="video-js vjs-big-play-centered"
       playsinline
     ></video>
   `
@@ -468,7 +469,7 @@ function renderShell() {
         </section>
 
         <section id="workspace" class="${videoUrl ? '' : 'hidden'} space-y-6">
-          <div id="player-host" class="overflow-hidden rounded-xl border border-slate-200 bg-black shadow-sm"></div>
+          <div id="player-host" class="mx-auto overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-sm"></div>
 
           <div class="flex flex-wrap items-center gap-2">
             <label class="inline-flex cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">

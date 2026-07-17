@@ -30,7 +30,8 @@ export async function initPlayer(videoEl: HTMLVideoElement, src: string): Promis
 
   player = vjs(videoEl, {
     controls: true,
-    fluid: true,
+    fluid: false,
+    responsive: true,
     preload: 'auto',
     playbackRates: [0.75, 1, 1.25, 1.5],
     controlBar: {
@@ -39,7 +40,57 @@ export async function initPlayer(videoEl: HTMLVideoElement, src: string): Promis
     sources: [{ src, type: guessMime(src) }],
   })
 
+  const applyFit = () => fitPlayerLayout(player!)
+  player.ready(() => {
+    applyFit()
+    player!.on('loadedmetadata', applyFit)
+    player!.on('loadeddata', applyFit)
+  })
+
+  window.addEventListener('resize', applyFit)
+
+  const prevDispose = player.dispose.bind(player)
+  player.dispose = () => {
+    window.removeEventListener('resize', applyFit)
+    prevDispose()
+  }
+
   return player
+}
+
+/** Size the player for landscape vs story/portrait videos. */
+export function fitPlayerLayout(p: Player = player!): void {
+  if (!p) return
+  const el = p.el() as HTMLElement | null
+  const host = document.getElementById('player-host')
+  if (!el || !host) return
+
+  const tech = p.tech(true) as unknown as { el?: () => HTMLVideoElement } | undefined
+  const media = tech?.el?.() ?? (el.querySelector('video') as HTMLVideoElement | null)
+  const w = media?.videoWidth || 0
+  const h = media?.videoHeight || 0
+  if (!w || !h) return
+
+  const portrait = h > w
+  host.classList.toggle('is-portrait', portrait)
+  host.classList.toggle('is-landscape', !portrait)
+
+  const ratio = `${w}:${h}`
+  p.aspectRatio(ratio)
+
+  // Cap height so stories stay moderate on large screens
+  const maxH = portrait
+    ? Math.min(window.innerHeight * 0.68, 560)
+    : Math.min(window.innerHeight * 0.52, 480)
+  const maxW = portrait ? Math.min(host.clientWidth || 360, 360) : host.clientWidth || 900
+  const heightFromWidth = (maxW * h) / w
+  const widthFromHeight = (maxH * w) / h
+
+  if (heightFromWidth <= maxH) {
+    p.dimensions(Math.round(maxW), Math.round(heightFromWidth))
+  } else {
+    p.dimensions(Math.round(widthFromHeight), Math.round(maxH))
+  }
 }
 
 function guessMime(src: string): string {

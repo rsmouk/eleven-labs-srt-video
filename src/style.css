@@ -7,11 +7,52 @@
   }
 }
 
-.video-js {
+#player-host {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   width: 100%;
-  height: auto;
+  max-height: min(70vh, 560px);
+  background: #0f172a;
+}
+
+#player-host .video-js {
+  width: 100%;
+  max-width: 100%;
+  max-height: min(70vh, 560px);
+  height: auto !important;
+}
+
+/* Landscape / default */
+#player-host.is-landscape .video-js {
   aspect-ratio: 16 / 9;
-  max-height: min(58vh, 560px);
+  max-width: min(100%, 900px);
+  max-height: min(52vh, 480px);
+}
+
+/* Story / portrait */
+#player-host.is-portrait .video-js {
+  aspect-ratio: 9 / 16;
+  width: auto;
+  max-width: min(100%, 360px);
+  max-height: min(68vh, 560px);
+}
+
+#player-host .video-js .vjs-tech {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 640px) {
+  #player-host.is-portrait .video-js {
+    max-width: min(100%, 300px);
+    max-height: min(62vh, 480px);
+  }
+
+  #player-host.is-landscape .video-js {
+    max-height: min(42vh, 360px);
+  }
 }
 
 .vjs-marker {
