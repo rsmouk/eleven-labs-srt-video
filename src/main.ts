@@ -14,11 +14,12 @@ import {
   updateMarkers,
 } from './player'
 import { bindNarrationSync, stopNarration, unbindNarrationSync } from './narration'
-import { fetchAccountVoices, voiceOptionLabel, type AccountVoice } from './voices'
+import { AUDIO_TAGS, insertAtCursor } from './audioTags'
 import { isSpeechSupported, startDictation } from './speech'
 import { loadLang, loadSettings, saveLang, saveSettings } from './storage'
 import { cuesToSrt, formatClock, formatFileTimestamp, parseTimeInput, uid } from './time'
 import type { Cue, ElevenSettings, Lang } from './types'
+import { fetchAccountVoices, voiceOptionLabel, type AccountVoice } from './voices'
 
 const root = document.querySelector<HTMLDivElement>('#app')!
 if (!root) throw new Error('#app missing')
@@ -446,6 +447,15 @@ function cuesHtml(): string {
               </button>
             </div>
           </div>
+          <div class="mt-2">
+            <p class="mb-1.5 text-[11px] font-medium text-slate-500">${t(lang, 'audioTags')} — ${t(lang, 'audioTagsHint')}</p>
+            <div class="flex flex-wrap gap-1.5">
+              ${AUDIO_TAGS.map(
+                (tag) =>
+                  `<button type="button" data-action="insert-tag" data-tag="${escapeHtml(tag)}" class="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-800 hover:bg-violet-100">${escapeHtml(tag)}</button>`,
+              ).join('')}
+            </div>
+          </div>
         </div>
       </article>`
     })
@@ -488,6 +498,15 @@ function bindCueEvents(list: HTMLElement) {
       })
     })
 
+    card.querySelectorAll<HTMLButtonElement>('[data-action="insert-tag"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const tag = btn.dataset.tag
+        const ta = card.querySelector<HTMLTextAreaElement>(`textarea[data-cue="${id}"]`)
+        if (!tag || !ta) return
+        insertAtCursor(ta, tag)
+        updateCue(id, { text: ta.value })
+      })
+    })
     card.querySelector('[data-action="generate"]')?.addEventListener('click', () => void generateOne(id))
     card.querySelector('[data-action="delete"]')?.addEventListener('click', () => removeCue(id))
     card.querySelector('[data-action="set-start-now"]')?.addEventListener('click', () => {
@@ -696,6 +715,7 @@ function renderShell() {
             <label class="block text-sm font-medium text-slate-700">
               <span id="lbl-model">${t(lang, 'modelId')}</span>
               <select id="set-model" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <option value="eleven_v3" ${settings.modelId === 'eleven_v3' ? 'selected' : ''}>eleven_v3 (audio tags)</option>
                 <option value="eleven_multilingual_v2" ${settings.modelId === 'eleven_multilingual_v2' ? 'selected' : ''}>eleven_multilingual_v2</option>
                 <option value="eleven_turbo_v2_5" ${settings.modelId === 'eleven_turbo_v2_5' ? 'selected' : ''}>eleven_turbo_v2_5</option>
                 <option value="eleven_flash_v2_5" ${settings.modelId === 'eleven_flash_v2_5' ? 'selected' : ''}>eleven_flash_v2_5</option>

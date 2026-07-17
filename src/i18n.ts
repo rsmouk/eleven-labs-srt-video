@@ -60,6 +60,8 @@ const dict = {
     needApiKeyForVoices: 'Enter your API key first, then load voices.',
     noFreeVoices: 'No free voices found on this account.',
     voicesLoadError: 'Could not load voices',
+    audioTags: 'Audio tags (eleven_v3)',
+    audioTagsHint: 'Requires model eleven_v3. Click a tag to insert it.',
   },
   ar: {
     brand: 'Narrate',
@@ -120,6 +122,8 @@ const dict = {
     needApiKeyForVoices: 'أدخل مفتاح API أولًا ثم حمّل الأصوات.',
     noFreeVoices: 'لا توجد أصوات مجانية في هذا الحساب.',
     voicesLoadError: 'تعذّر تحميل الأصوات',
+    audioTags: 'وسوم صوتية (eleven_v3)',
+    audioTagsHint: 'تتطلب النموذج eleven_v3. اضغط وسمًا لإضافته.',
   },
 } as const
 
