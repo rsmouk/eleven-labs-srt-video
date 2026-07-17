@@ -59,7 +59,7 @@ export async function initPlayer(videoEl: HTMLVideoElement, src: string): Promis
   return player
 }
 
-/** Fit player to the video's natural aspect ratio within a moderate box. */
+/** Full-width player; video keeps natural aspect via object-fit. */
 export function fitPlayerLayout(p: Player = player!): void {
   if (!p) return
   const el = p.el() as HTMLElement | null
@@ -73,27 +73,19 @@ export function fitPlayerLayout(p: Player = player!): void {
   if (!vw || !vh) return
 
   const portrait = vh > vw
-  const availableW = host.clientWidth || window.innerWidth
-  // Natural box: don't force stories into a skinny column
-  const maxW = Math.min(availableW - 2, portrait ? 420 : 960)
+  const width = host.clientWidth || el.parentElement?.clientWidth || window.innerWidth
   const maxH = Math.min(window.innerHeight * 0.55, portrait ? 520 : 480)
 
-  let width = maxW
+  // Height from natural ratio at full width, then cap
   let height = (width * vh) / vw
-
-  if (height > maxH) {
-    height = maxH
-    width = (height * vw) / vh
-  }
-
-  width = Math.max(Math.round(width), 200)
-  height = Math.max(Math.round(height), 160)
+  if (height > maxH) height = maxH
+  height = Math.max(Math.round(height), 200)
 
   p.dimensions(width, height)
-  el.style.width = `${width}px`
+  el.style.width = '100%'
+  el.style.maxWidth = '100%'
   el.style.height = `${height}px`
   el.style.paddingTop = '0'
-  el.style.maxWidth = '100%'
   el.classList.remove('vjs-fluid', 'vjs-16-9', 'vjs-4-3', 'vjs-9-16')
 }
 

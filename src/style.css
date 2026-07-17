@@ -8,18 +8,17 @@
 }
 
 #player-host {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: block;
   width: 100%;
   background: #0f172a;
 }
 
 #player-host .video-js {
   position: relative;
+  display: block;
   background: #000;
-  width: 100%;
-  max-width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 #player-host .video-js .vjs-tech {
@@ -27,12 +26,14 @@
   background: #000;
 }
 
-/* Control bar always visible inside the player */
+/* Control bar always visible and full width */
 #player-host .video-js .vjs-control-bar {
   position: absolute !important;
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
   opacity: 1 !important;
   visibility: visible !important;
   display: flex !important;
