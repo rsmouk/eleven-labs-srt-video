@@ -321,7 +321,7 @@ function cuesHtml(): string {
             </button>
             ${
               c.audioUrl
-                ? `<button type="button" data-action="play-audio" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'playAudio')}</button>`
+                ? `<button type="button" data-action="play-audio" class="rounded-md bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700">${t(lang, 'playAudio')}</button>`
                 : ''
             }
             <button type="button" data-action="delete" class="rounded-md px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50">${t(lang, 'delete')}</button>
@@ -359,7 +359,6 @@ function cuesHtml(): string {
             </div>
           </div>
         </div>
-        ${c.audioUrl ? `<audio class="mt-3 w-full" controls src="${c.audioUrl}"></audio>` : ''}
       </article>`
     })
     .join('')
@@ -419,7 +418,10 @@ function bindCueEvents(list: HTMLElement) {
       if (cue) seekAndPlay(cue.start)
     })
     card.querySelector('[data-action="play-audio"]')?.addEventListener('click', () => {
-      void card.querySelector('audio')?.play()
+      const cue = cues.find((c) => c.id === id)
+      if (!cue?.audioUrl) return
+      const preview = new Audio(cue.audioUrl)
+      void preview.play()
     })
   })
 }
