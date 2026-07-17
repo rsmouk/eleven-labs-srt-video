@@ -19,7 +19,13 @@ import { isSpeechSupported, startDictation } from './speech'
 import { loadLang, loadSettings, saveLang, saveSettings } from './storage'
 import { cuesToSrt, formatClock, formatFileTimestamp, parseTimeInput, uid } from './time'
 import type { Cue, ElevenSettings, Lang } from './types'
-import { fetchAccountVoices, voiceOptionLabel, type AccountVoice } from './voices'
+import {
+  FALLBACK_FREE_VOICES,
+  fetchAccountVoices,
+  isVoicesReadPermissionError,
+  voiceOptionLabel,
+  type AccountVoice,
+} from './voices'
 
 const root = document.querySelector<HTMLDivElement>('#app')!
 if (!root) throw new Error('#app missing')
@@ -266,7 +272,7 @@ async function downloadAudioZip() {
   saveAs(await zip.generateAsync({ type: 'blob' }), `${videoName || 'narration'}_audio.zip`)
 }
 
-let accountVoices: AccountVoice[] = []
+let accountVoices: AccountVoice[] = [...FALLBACK_FREE_VOICES]
 let voicesLoading = false
 
 function openSettings() {
@@ -286,9 +292,11 @@ function closeSettings() {
 }
 
 function persistSettingsFromForm() {
+  const selectVoice = (document.getElementById('set-voice') as HTMLSelectElement).value.trim()
+  const customVoice = (document.getElementById('set-voice-custom') as HTMLInputElement).value.trim()
   settings = {
     apiKey: (document.getElementById('set-api') as HTMLInputElement).value,
-    voiceId: (document.getElementById('set-voice') as HTMLSelectElement).value,
+    voiceId: customVoice || selectVoice,
     modelId: (document.getElementById('set-model') as HTMLInputElement).value,
   }
   saveSettings(settings)
@@ -353,26 +361,50 @@ async function loadAccountVoices() {
   try {
     accountVoices = await fetchAccountVoices(apiKey)
     if (!accountVoices.length) {
+      accountVoices = [...FALLBACK_FREE_VOICES]
       showToast(t(lang, 'noFreeVoices'))
-    } else if (!settings.voiceId || !accountVoices.some((v) => v.id === settings.voiceId)) {
-      // Prefer a previously selected voice, else first free voice
-      const pick = accountVoices[0]
-      if (pick) {
-        settings = { ...settings, voiceId: pick.id }
-        saveSettings(settings)
-      }
     }
+    ensureSelectedVoice()
   } catch (err) {
-    accountVoices = []
-    showToast(`${t(lang, 'voicesLoadError')}: ${err instanceof Error ? err.message : String(err)}`)
+    const message = err instanceof Error ? err.message : String(err)
+    if (isVoicesReadPermissionError(message)) {
+      accountVoices = [...FALLBACK_FREE_VOICES]
+      ensureSelectedVoice()
+      showToast(t(lang, 'usingFallbackVoices'))
+    } else {
+      accountVoices = [...FALLBACK_FREE_VOICES]
+      ensureSelectedVoice()
+      showToast(`${t(lang, 'voicesLoadError')}: ${message}`)
+    }
   } finally {
     voicesLoading = false
     refreshVoiceSelect()
+    syncCustomVoiceField()
     if (btn) {
       btn.disabled = false
       btn.textContent = t(lang, 'loadVoices')
     }
   }
+}
+
+function ensureSelectedVoice() {
+  if (!accountVoices.length) return
+  if (!settings.voiceId || !accountVoices.some((v) => v.id === settings.voiceId)) {
+    const pick = accountVoices[0]
+    if (pick) {
+      settings = { ...settings, voiceId: pick.id }
+      saveSettings(settings)
+    }
+  }
+}
+
+function syncCustomVoiceField() {
+  const custom = document.getElementById('set-voice-custom') as HTMLInputElement | null
+  const select = document.getElementById('set-voice') as HTMLSelectElement | null
+  if (!custom || !select) return
+  const known = accountVoices.some((v) => v.id === settings.voiceId)
+  custom.value = known ? '' : settings.voiceId
+  if (known) select.value = settings.voiceId
 }
 
 async function installPwa() {
@@ -568,6 +600,8 @@ function updateChromeTexts() {
     ['btn-save-settings', t(lang, 'save')],
     ['btn-load-voices', t(lang, 'loadVoices')],
     ['txt-voices-hint', t(lang, 'voicesHint')],
+    ['txt-voices-permission', t(lang, 'voicesReadPermission')],
+    ['lbl-voice-custom', t(lang, 'customVoiceId')],
   ]
   for (const [id, text] of map) {
     const el = document.getElementById(id)
@@ -710,7 +744,12 @@ function renderShell() {
                 ${voiceSelectHtml(settings.voiceId)}
               </select>
             </label>
+            <label class="block text-sm font-medium text-slate-700">
+              <span id="lbl-voice-custom">${t(lang, 'customVoiceId')}</span>
+              <input id="set-voice-custom" type="text" value="" autocomplete="off" placeholder="TX3LPaxmHKxFdv7VOQHJ" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+            </label>
             <p id="txt-voices-hint" class="text-xs text-slate-500">${t(lang, 'voicesHint')}</p>
+            <p id="txt-voices-permission" class="text-xs text-amber-700">${t(lang, 'voicesReadPermission')}</p>
             <button type="button" id="btn-load-voices" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'loadVoices')}</button>
             <label class="block text-sm font-medium text-slate-700">
               <span id="lbl-model">${t(lang, 'modelId')}</span>
@@ -762,9 +801,13 @@ function bindShellEvents() {
   })
   document.getElementById('btn-load-voices')?.addEventListener('click', () => void loadAccountVoices())
   document.getElementById('set-api')?.addEventListener('change', () => {
-    accountVoices = []
     refreshVoiceSelect()
   })
+  document.getElementById('set-voice')?.addEventListener('change', () => {
+    const custom = document.getElementById('set-voice-custom') as HTMLInputElement | null
+    if (custom) custom.value = ''
+  })
+  syncCustomVoiceField()
   document.getElementById('btn-close-settings')?.addEventListener('click', closeSettings)
   document.getElementById('settings-backdrop')?.addEventListener('click', closeSettings)
   document.getElementById('settings-form')?.addEventListener('submit', (e) => {

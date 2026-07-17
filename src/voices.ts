@@ -18,6 +18,31 @@ interface ElevenVoiceDto {
 /** Categories usable on free API plans (not Voice Library community voices). */
 const FREE_API_CATEGORIES = new Set(['premade', 'cloned', 'generated'])
 
+/**
+ * Default voices usable when the API key lacks `voices_read`.
+ * Prefer these over Voice Library IDs which free API rejects.
+ */
+export const FALLBACK_FREE_VOICES: AccountVoice[] = [
+  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', gender: 'male', category: 'premade' },
+  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice', gender: 'female', category: 'premade' },
+  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', gender: 'female', category: 'premade' },
+  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura', gender: 'female', category: 'premade' },
+  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', gender: 'male', category: 'premade' },
+  { id: 'iP95p4xoKVk53GoZ742B', name: 'Chris', gender: 'male', category: 'premade' },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', gender: 'male', category: 'premade' },
+  { id: 'cjVigY5qzO86Huf0OWal', name: 'Eric', gender: 'male', category: 'premade' },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', gender: 'male', category: 'premade' },
+  { id: 'bIHbv24MWmeRgasZH58o', name: 'Will', gender: 'male', category: 'premade' },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', gender: 'female', category: 'premade' },
+  { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', gender: 'female', category: 'premade' },
+  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', gender: 'female', category: 'premade' },
+  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill', gender: 'male', category: 'premade' },
+]
+
+export function isVoicesReadPermissionError(message: string): boolean {
+  return /voices_read/i.test(message) || /missing the permission/i.test(message)
+}
+
 export async function fetchAccountVoices(apiKey: string): Promise<AccountVoice[]> {
   const res = await fetch('https://api.elevenlabs.io/v1/voices', {
     headers: {
@@ -46,9 +71,7 @@ export async function fetchAccountVoices(apiKey: string): Promise<AccountVoice[]
   return voices
     .filter((v) => {
       const category = (v.category || '').toLowerCase()
-      // Skip Voice Library copies — free API rejects them
       if (v.sharing?.status === 'copied') return false
-      // Default premade + own clones/generated (Voice Design)
       return FREE_API_CATEGORIES.has(category)
     })
     .map((v) => {

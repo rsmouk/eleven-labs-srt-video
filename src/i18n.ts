@@ -60,6 +60,10 @@ const dict = {
     needApiKeyForVoices: 'Enter your API key first, then load voices.',
     noFreeVoices: 'No free voices found on this account.',
     voicesLoadError: 'Could not load voices',
+    voicesReadPermission:
+      'API key is missing voices_read. Enable it in ElevenLabs → API Keys, or use the default free list / paste a Voice ID.',
+    customVoiceId: 'Or paste Voice ID',
+    usingFallbackVoices: 'Using default free voices (API key lacks voices_read).',
     audioTags: 'Audio tags (eleven_v3)',
     audioTagsHint: 'Requires model eleven_v3. Click a tag to insert it.',
   },
@@ -122,6 +126,10 @@ const dict = {
     needApiKeyForVoices: 'أدخل مفتاح API أولًا ثم حمّل الأصوات.',
     noFreeVoices: 'لا توجد أصوات مجانية في هذا الحساب.',
     voicesLoadError: 'تعذّر تحميل الأصوات',
+    voicesReadPermission:
+      'مفتاح API بدون صلاحية voices_read. فعّلها من ElevenLabs → API Keys، أو استخدم القائمة الافتراضية / الصق Voice ID.',
+    customVoiceId: 'أو الصق معرّف الصوت',
+    usingFallbackVoices: 'تم استخدام الأصوات المجانية الافتراضية (المفتاح بلا voices_read).',
     audioTags: 'وسوم صوتية (eleven_v3)',
     audioTagsHint: 'تتطلب النموذج eleven_v3. اضغط وسمًا لإضافته.',
   },
