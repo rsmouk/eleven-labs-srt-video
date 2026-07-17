@@ -31,7 +31,7 @@ export async function initPlayer(videoEl: HTMLVideoElement, src: string): Promis
   player = vjs(videoEl, {
     controls: true,
     fluid: false,
-    responsive: true,
+    responsive: false,
     preload: 'auto',
     inactivityTimeout: 0,
     playbackRates: [0.75, 1, 1.25, 1.5],
@@ -59,7 +59,7 @@ export async function initPlayer(videoEl: HTMLVideoElement, src: string): Promis
   return player
 }
 
-/** Size the player for landscape vs story/portrait videos. */
+/** Fit player to the video's natural aspect ratio within a moderate box. */
 export function fitPlayerLayout(p: Player = player!): void {
   if (!p) return
   const el = p.el() as HTMLElement | null
@@ -68,40 +68,33 @@ export function fitPlayerLayout(p: Player = player!): void {
 
   const tech = p.tech(true) as unknown as { el?: () => HTMLVideoElement } | undefined
   const media = tech?.el?.() ?? (el.querySelector('video') as HTMLVideoElement | null)
-  const w = media?.videoWidth || 0
-  const h = media?.videoHeight || 0
-  if (!w || !h) return
+  const vw = media?.videoWidth || 0
+  const vh = media?.videoHeight || 0
+  if (!vw || !vh) return
 
-  const portrait = h > w
-  host.classList.toggle('is-portrait', portrait)
-  host.classList.toggle('is-landscape', !portrait)
+  const portrait = vh > vw
+  const availableW = host.clientWidth || window.innerWidth
+  // Natural box: don't force stories into a skinny column
+  const maxW = Math.min(availableW - 2, portrait ? 420 : 960)
+  const maxH = Math.min(window.innerHeight * 0.55, portrait ? 520 : 480)
 
-  const maxH = portrait
-    ? Math.min(window.innerHeight * 0.62, 520)
-    : Math.min(window.innerHeight * 0.48, 440)
-  const maxW = portrait
-    ? Math.min(host.clientWidth || 360, 360)
-    : Math.min(host.clientWidth || 900, 900)
+  let width = maxW
+  let height = (width * vh) / vw
 
-  const heightFromWidth = (maxW * h) / w
-  let width: number
-  let height: number
-  if (heightFromWidth <= maxH) {
-    width = maxW
-    height = heightFromWidth
-  } else {
-    width = (maxH * w) / h
+  if (height > maxH) {
     height = maxH
+    width = (height * vw) / vh
   }
 
-  // Ensure minimum height so the control bar stays inside the player box
-  height = Math.max(height, 180)
+  width = Math.max(Math.round(width), 200)
+  height = Math.max(Math.round(height), 160)
 
-  p.aspectRatio(`${w}:${h}`)
-  p.dimensions(Math.round(width), Math.round(height))
-  el.style.width = `${Math.round(width)}px`
-  el.style.height = `${Math.round(height)}px`
+  p.dimensions(width, height)
+  el.style.width = `${width}px`
+  el.style.height = `${height}px`
+  el.style.paddingTop = '0'
   el.style.maxWidth = '100%'
+  el.classList.remove('vjs-fluid', 'vjs-16-9', 'vjs-4-3', 'vjs-9-16')
 }
 
 function guessMime(src: string): string {
