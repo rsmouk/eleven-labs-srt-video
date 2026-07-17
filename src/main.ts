@@ -14,6 +14,7 @@ import {
   updateMarkers,
 } from './player'
 import { bindNarrationSync, stopNarration, unbindNarrationSync } from './narration'
+import { FREE_VOICES, voiceOptionLabel } from './voices'
 import { isSpeechSupported, startDictation } from './speech'
 import { loadLang, loadSettings, saveLang, saveSettings } from './storage'
 import { cuesToSrt, formatClock, formatFileTimestamp, parseTimeInput, uid } from './time'
@@ -279,12 +280,39 @@ function closeSettings() {
 function persistSettingsFromForm() {
   settings = {
     apiKey: (document.getElementById('set-api') as HTMLInputElement).value,
-    voiceId: (document.getElementById('set-voice') as HTMLInputElement).value,
+    voiceId: (document.getElementById('set-voice') as HTMLSelectElement).value,
     modelId: (document.getElementById('set-model') as HTMLInputElement).value,
   }
   saveSettings(settings)
   showToast(t(lang, 'saved'))
   closeSettings()
+}
+
+function voiceSelectHtml(selectedId: string): string {
+  const options = FREE_VOICES.map((v) => {
+    const label = voiceOptionLabel(v, t(lang, 'male'), t(lang, 'female'))
+    const selected = v.id === selectedId ? 'selected' : ''
+    return `<option value="${v.id}" ${selected}>${escapeHtml(label)}</option>`
+  }).join('')
+
+  const known = FREE_VOICES.some((v) => v.id === selectedId)
+  const custom =
+    selectedId && !known
+      ? `<option value="${escapeHtml(selectedId)}" selected>${escapeHtml(selectedId)} (${lang === 'ar' ? 'مخصص' : 'Custom'})</option>`
+      : ''
+
+  return `
+    <option value="" ${!selectedId ? 'selected' : ''}>${t(lang, 'selectVoice')}</option>
+    ${custom}
+    ${options}
+  `
+}
+
+function refreshVoiceSelect() {
+  const select = document.getElementById('set-voice') as HTMLSelectElement | null
+  if (!select) return
+  const current = select.value || settings.voiceId
+  select.innerHTML = voiceSelectHtml(current)
 }
 
 async function installPwa() {
@@ -331,7 +359,7 @@ function cuesHtml(): string {
         <div class="flex flex-col gap-1">
           <span class="text-xs font-medium text-slate-600">${t(lang, 'text')}</span>
           <div class="flex items-start gap-2">
-            <textarea data-cue="${c.id}" data-field="text" rows="2" placeholder="${t(lang, 'cuePlaceholder')}" class="min-w-0 flex-1 resize-y rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">${escapeHtml(c.text)}</textarea>
+            <textarea data-cue="${c.id}" data-field="text" rows="4" placeholder="${t(lang, 'cuePlaceholder')}" class="min-w-0 flex-1 resize-y rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">${escapeHtml(c.text)}</textarea>
             <div class="flex shrink-0 flex-col gap-2">
               <button
                 type="button"
@@ -587,7 +615,9 @@ function renderShell() {
             </label>
             <label class="block text-sm font-medium text-slate-700">
               <span id="lbl-voice">${t(lang, 'voiceId')}</span>
-              <input id="set-voice" type="text" value="${escapeHtml(settings.voiceId)}" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="e.g. 21m00Tcm4TlvDq8ikWAM" />
+              <select id="set-voice" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                ${voiceSelectHtml(settings.voiceId)}
+              </select>
             </label>
             <label class="block text-sm font-medium text-slate-700">
               <span id="lbl-model">${t(lang, 'modelId')}</span>
@@ -630,8 +660,12 @@ function bindShellEvents() {
     saveLang(lang)
     applyDir()
     updateChromeTexts()
+    refreshVoiceSelect()
   })
-  document.getElementById('btn-settings')?.addEventListener('click', openSettings)
+  document.getElementById('btn-settings')?.addEventListener('click', () => {
+    refreshVoiceSelect()
+    openSettings()
+  })
   document.getElementById('btn-close-settings')?.addEventListener('click', closeSettings)
   document.getElementById('settings-backdrop')?.addEventListener('click', closeSettings)
   document.getElementById('settings-form')?.addEventListener('submit', (e) => {

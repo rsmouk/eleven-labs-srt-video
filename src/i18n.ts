@@ -49,6 +49,9 @@ const dict = {
     srtShort: 'SRT',
     audioShort: 'Audio',
     changeShort: 'Video',
+    male: 'Male',
+    female: 'Female',
+    selectVoice: 'Select a free voice',
   },
   ar: {
     brand: 'Narrate',
@@ -98,6 +101,9 @@ const dict = {
     srtShort: 'SRT',
     audioShort: 'صوت',
     changeShort: 'فيديو',
+    male: 'ذكر',
+    female: 'أنثى',
+    selectVoice: 'اختر صوتًا مجانيًا',
   },
 } as const
 
