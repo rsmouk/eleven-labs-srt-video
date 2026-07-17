@@ -524,8 +524,8 @@ function renderShell() {
             <div id="video-panel" class="space-y-2 border-b border-slate-200 pb-2 lg:border-b-0 lg:pb-0">
               <div id="player-host" class="overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-sm"></div>
 
-              <div id="workspace-toolbar" class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2 py-2 shadow-sm lg:justify-start lg:px-3">
-                <label id="btn-change-wrap" title="${t(lang, 'changeVideo')}" class="toolbar-icon-btn cursor-pointer lg:inline-flex lg:w-auto lg:gap-2 lg:px-3">
+              <div id="workspace-toolbar" class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+                <label id="btn-change-wrap" title="${t(lang, 'changeVideo')}" class="toolbar-icon-btn cursor-pointer">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14M4 8h8a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4a2 2 0 012-2z"/>
                   </svg>
@@ -533,28 +533,28 @@ function renderShell() {
                   <input id="file-input-change" type="file" accept="video/*" class="hidden" />
                 </label>
 
-                <button type="button" id="btn-add-cue" title="${t(lang, 'addCue')}" class="toolbar-icon-btn-primary lg:inline-flex lg:w-auto lg:gap-2 lg:px-3">
+                <button type="button" id="btn-add-cue" title="${t(lang, 'addCue')}" class="toolbar-icon-btn-primary">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
                   </svg>
                   <span id="txt-add-cue" class="hidden text-sm font-medium lg:inline">${t(lang, 'addCue')}</span>
                 </button>
 
-                <button type="button" id="btn-gen-all" title="${t(lang, 'generateAll')}" class="toolbar-icon-btn lg:inline-flex lg:w-auto lg:gap-2 lg:px-3">
+                <button type="button" id="btn-gen-all" title="${t(lang, 'generateAll')}" class="toolbar-icon-btn">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V9l12-2v10M9 19c0 1.1-1.3 2-3 2s-3-.9-3-2 1.3-2 3-2 3 .9 3 2zm12-2c0 1.1-1.3 2-3 2s-3-.9-3-2 1.3-2 3-2 3 .9 3 2z"/>
                   </svg>
                   <span id="txt-gen-all" class="hidden text-sm font-medium lg:inline">${t(lang, 'generateAll')}</span>
                 </button>
 
-                <button type="button" id="btn-dl-srt" title="${t(lang, 'downloadSrt')}" class="toolbar-icon-btn lg:inline-flex lg:w-auto lg:gap-2 lg:px-3">
+                <button type="button" id="btn-dl-srt" title="${t(lang, 'downloadSrt')}" class="toolbar-icon-btn">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M7 4h7l3 3v13a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z"/>
                   </svg>
                   <span id="txt-dl-srt" class="hidden text-sm font-medium lg:inline">${t(lang, 'downloadSrt')}</span>
                 </button>
 
-                <button type="button" id="btn-dl-audio" title="${t(lang, 'downloadAudio')}" class="toolbar-icon-btn lg:inline-flex lg:w-auto lg:gap-2 lg:px-3">
+                <button type="button" id="btn-dl-audio" title="${t(lang, 'downloadAudio')}" class="toolbar-icon-btn">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4"/>
                   </svg>

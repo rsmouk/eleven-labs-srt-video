@@ -65,11 +65,22 @@
 }
 
 .toolbar-icon-btn {
-  @apply inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50;
+  @apply inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-0 text-slate-700 shadow-sm hover:bg-slate-50;
+  width: 2.5rem;
 }
 
 .toolbar-icon-btn-primary {
-  @apply inline-flex h-10 w-10 items-center justify-center rounded-md bg-blue-600 text-white shadow-sm hover:bg-blue-700;
+  @apply inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-0 text-white shadow-sm hover:bg-blue-700;
+  width: 2.5rem;
+}
+
+@media (min-width: 1024px) {
+  .toolbar-icon-btn,
+  .toolbar-icon-btn-primary {
+    width: auto;
+    padding-inline: 0.75rem;
+    white-space: nowrap;
+  }
 }
 
 .vjs-marker {
