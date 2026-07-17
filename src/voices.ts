@@ -1,40 +1,77 @@
-export type VoiceGender = 'male' | 'female'
+export type VoiceGender = 'male' | 'female' | 'unknown'
 
-export interface FreeVoice {
+export interface AccountVoice {
   id: string
   name: string
   gender: VoiceGender
+  category: string
 }
 
-/** Well-known ElevenLabs premade voices available on free plans. */
-export const FREE_VOICES: FreeVoice[] = [
-  { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', gender: 'female' },
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', gender: 'female' },
-  { id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi', gender: 'female' },
-  { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli', gender: 'female' },
-  { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', gender: 'female' },
-  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', gender: 'female' },
-  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', gender: 'female' },
-  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice', gender: 'female' },
-  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', gender: 'male' },
-  { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni', gender: 'male' },
-  { id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold', gender: 'male' },
-  { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', gender: 'male' },
-  { id: 'yoZ06aMxZJJ28mfd3POQ', name: 'Sam', gender: 'male' },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', gender: 'male' },
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', gender: 'male' },
-  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', gender: 'male' },
-  { id: 'iP95p4xoKVk53GoZ742B', name: 'Chris', gender: 'male' },
-  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill', gender: 'male' },
-  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', gender: 'male' },
-  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: 'male' },
-]
+interface ElevenVoiceDto {
+  voice_id: string
+  name: string
+  category?: string
+  labels?: Record<string, string>
+  sharing?: { status?: string } | null
+}
+
+/** Categories usable on free API plans (not Voice Library community voices). */
+const FREE_API_CATEGORIES = new Set(['premade', 'cloned', 'generated'])
+
+export async function fetchAccountVoices(apiKey: string): Promise<AccountVoice[]> {
+  const res = await fetch('https://api.elevenlabs.io/v1/voices', {
+    headers: {
+      'xi-api-key': apiKey.trim(),
+      Accept: 'application/json',
+    },
+  })
+
+  if (!res.ok) {
+    let detail = res.statusText
+    try {
+      const err = (await res.json()) as { detail?: { message?: string } | string }
+      if (typeof err.detail === 'string') detail = err.detail
+      else if (err.detail && typeof err.detail === 'object' && err.detail.message) {
+        detail = err.detail.message
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail || `HTTP ${res.status}`)
+  }
+
+  const data = (await res.json()) as { voices?: ElevenVoiceDto[] }
+  const voices = data.voices ?? []
+
+  return voices
+    .filter((v) => {
+      const category = (v.category || '').toLowerCase()
+      // Skip Voice Library copies — free API rejects them
+      if (v.sharing?.status === 'copied') return false
+      // Default premade + own clones/generated (Voice Design)
+      return FREE_API_CATEGORIES.has(category)
+    })
+    .map((v) => {
+      const rawGender = (v.labels?.gender || '').toLowerCase()
+      const gender: VoiceGender =
+        rawGender === 'male' || rawGender === 'female' ? rawGender : 'unknown'
+      return {
+        id: v.voice_id,
+        name: v.name,
+        gender,
+        category: (v.category || 'premade').toLowerCase(),
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
 
 export function voiceOptionLabel(
-  voice: FreeVoice,
+  voice: AccountVoice,
   maleLabel: string,
   femaleLabel: string,
+  unknownLabel: string,
 ): string {
-  const gender = voice.gender === 'male' ? maleLabel : femaleLabel
+  const gender =
+    voice.gender === 'male' ? maleLabel : voice.gender === 'female' ? femaleLabel : unknownLabel
   return `${voice.name} — ${gender}`
 }

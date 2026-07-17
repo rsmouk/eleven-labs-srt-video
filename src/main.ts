@@ -14,7 +14,7 @@ import {
   updateMarkers,
 } from './player'
 import { bindNarrationSync, stopNarration, unbindNarrationSync } from './narration'
-import { FREE_VOICES, voiceOptionLabel } from './voices'
+import { fetchAccountVoices, voiceOptionLabel, type AccountVoice } from './voices'
 import { isSpeechSupported, startDictation } from './speech'
 import { loadLang, loadSettings, saveLang, saveSettings } from './storage'
 import { cuesToSrt, formatClock, formatFileTimestamp, parseTimeInput, uid } from './time'
@@ -265,10 +265,17 @@ async function downloadAudioZip() {
   saveAs(await zip.generateAsync({ type: 'blob' }), `${videoName || 'narration'}_audio.zip`)
 }
 
+let accountVoices: AccountVoice[] = []
+let voicesLoading = false
+
 function openSettings() {
   const modal = document.getElementById('settings-modal')
   modal?.classList.remove('hidden')
   modal?.setAttribute('aria-hidden', 'false')
+  const apiInput = document.getElementById('set-api') as HTMLInputElement | null
+  if (apiInput?.value.trim() && accountVoices.length === 0) {
+    void loadAccountVoices()
+  }
 }
 
 function closeSettings() {
@@ -289,20 +296,28 @@ function persistSettingsFromForm() {
 }
 
 function voiceSelectHtml(selectedId: string): string {
-  const options = FREE_VOICES.map((v) => {
-    const label = voiceOptionLabel(v, t(lang, 'male'), t(lang, 'female'))
-    const selected = v.id === selectedId ? 'selected' : ''
-    return `<option value="${v.id}" ${selected}>${escapeHtml(label)}</option>`
-  }).join('')
+  const options = accountVoices
+    .map((v) => {
+      const label = voiceOptionLabel(v, t(lang, 'male'), t(lang, 'female'), t(lang, 'genderUnknown'))
+      const selected = v.id === selectedId ? 'selected' : ''
+      return `<option value="${v.id}" ${selected}>${escapeHtml(label)}</option>`
+    })
+    .join('')
 
-  const known = FREE_VOICES.some((v) => v.id === selectedId)
+  const known = accountVoices.some((v) => v.id === selectedId)
   const custom =
     selectedId && !known
-      ? `<option value="${escapeHtml(selectedId)}" selected>${escapeHtml(selectedId)} (${lang === 'ar' ? 'مخصص' : 'Custom'})</option>`
+      ? `<option value="${escapeHtml(selectedId)}" selected>${escapeHtml(selectedId)}</option>`
       : ''
 
+  const placeholder = voicesLoading
+    ? t(lang, 'loadingVoices')
+    : accountVoices.length
+      ? t(lang, 'selectVoice')
+      : t(lang, 'selectVoice')
+
   return `
-    <option value="" ${!selectedId ? 'selected' : ''}>${t(lang, 'selectVoice')}</option>
+    <option value="" ${!selectedId ? 'selected' : ''}>${escapeHtml(placeholder)}</option>
     ${custom}
     ${options}
   `
@@ -313,6 +328,50 @@ function refreshVoiceSelect() {
   if (!select) return
   const current = select.value || settings.voiceId
   select.innerHTML = voiceSelectHtml(current)
+  select.disabled = voicesLoading
+}
+
+async function loadAccountVoices() {
+  const apiKey =
+    (document.getElementById('set-api') as HTMLInputElement | null)?.value.trim() ||
+    settings.apiKey.trim()
+
+  if (!apiKey) {
+    showToast(t(lang, 'needApiKeyForVoices'))
+    return
+  }
+
+  voicesLoading = true
+  refreshVoiceSelect()
+  const btn = document.getElementById('btn-load-voices') as HTMLButtonElement | null
+  if (btn) {
+    btn.disabled = true
+    btn.textContent = t(lang, 'loadingVoices')
+  }
+
+  try {
+    accountVoices = await fetchAccountVoices(apiKey)
+    if (!accountVoices.length) {
+      showToast(t(lang, 'noFreeVoices'))
+    } else if (!settings.voiceId || !accountVoices.some((v) => v.id === settings.voiceId)) {
+      // Prefer a previously selected voice, else first free voice
+      const pick = accountVoices[0]
+      if (pick) {
+        settings = { ...settings, voiceId: pick.id }
+        saveSettings(settings)
+      }
+    }
+  } catch (err) {
+    accountVoices = []
+    showToast(`${t(lang, 'voicesLoadError')}: ${err instanceof Error ? err.message : String(err)}`)
+  } finally {
+    voicesLoading = false
+    refreshVoiceSelect()
+    if (btn) {
+      btn.disabled = false
+      btn.textContent = t(lang, 'loadVoices')
+    }
+  }
 }
 
 async function installPwa() {
@@ -488,6 +547,8 @@ function updateChromeTexts() {
     ['lbl-model', t(lang, 'modelId')],
     ['btn-close-settings', t(lang, 'close')],
     ['btn-save-settings', t(lang, 'save')],
+    ['btn-load-voices', t(lang, 'loadVoices')],
+    ['txt-voices-hint', t(lang, 'voicesHint')],
   ]
   for (const [id, text] of map) {
     const el = document.getElementById(id)
@@ -630,6 +691,8 @@ function renderShell() {
                 ${voiceSelectHtml(settings.voiceId)}
               </select>
             </label>
+            <p id="txt-voices-hint" class="text-xs text-slate-500">${t(lang, 'voicesHint')}</p>
+            <button type="button" id="btn-load-voices" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'loadVoices')}</button>
             <label class="block text-sm font-medium text-slate-700">
               <span id="lbl-model">${t(lang, 'modelId')}</span>
               <select id="set-model" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
@@ -676,6 +739,11 @@ function bindShellEvents() {
   document.getElementById('btn-settings')?.addEventListener('click', () => {
     refreshVoiceSelect()
     openSettings()
+  })
+  document.getElementById('btn-load-voices')?.addEventListener('click', () => void loadAccountVoices())
+  document.getElementById('set-api')?.addEventListener('change', () => {
+    accountVoices = []
+    refreshVoiceSelect()
   })
   document.getElementById('btn-close-settings')?.addEventListener('click', closeSettings)
   document.getElementById('settings-backdrop')?.addEventListener('click', closeSettings)
