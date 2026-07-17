@@ -44,6 +44,20 @@
   height: 100%;
 }
 
+/* Keep control bar always visible */
+#player-host .video-js .vjs-control-bar {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: flex !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+#player-host .video-js.vjs-user-inactive .vjs-control-bar {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
 @media (max-width: 640px) {
   #player-host.is-portrait .video-js {
     max-width: min(100%, 300px);

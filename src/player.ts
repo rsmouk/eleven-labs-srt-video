@@ -33,6 +33,7 @@ export async function initPlayer(videoEl: HTMLVideoElement, src: string): Promis
     fluid: false,
     responsive: true,
     preload: 'auto',
+    inactivityTimeout: 0,
     playbackRates: [0.75, 1, 1.25, 1.5],
     controlBar: {
       pictureInPictureToggle: false,
