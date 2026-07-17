@@ -13,6 +13,7 @@ import {
   seekAndPlay,
   updateMarkers,
 } from './player'
+import { bindNarrationSync, stopNarration, unbindNarrationSync } from './narration'
 import { isSpeechSupported, startDictation } from './speech'
 import { loadLang, loadSettings, saveLang, saveSettings } from './storage'
 import { cuesToSrt, formatClock, formatFileTimestamp, parseTimeInput, uid } from './time'
@@ -76,6 +77,8 @@ function setVideoFile(file: File) {
   if (videoUrl) URL.revokeObjectURL(videoUrl)
   cues.forEach(revokeCueAudio)
   cues = []
+  stopNarration()
+  unbindNarrationSync()
   disposePlayer()
   videoUrl = URL.createObjectURL(file)
   videoName = file.name.replace(/\.[^.]+$/, '') || 'video'
@@ -102,6 +105,7 @@ async function mountPlayer() {
   player.ready(() => {
     updateMarkers(cues)
     player.on('loadedmetadata', () => updateMarkers(cues))
+    bindNarrationSync(player, () => cues)
   })
 }
 
