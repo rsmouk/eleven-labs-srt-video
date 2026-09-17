@@ -70,6 +70,9 @@ const dict = {
     overlapWarning:
       'Previous audio still covers this time (until {time}). Move the start later so the previous line can finish.',
     overlapToast: 'This caption overlaps earlier audio — adjust the start time.',
+    emptyCuePreview: 'Empty caption',
+    expandCue: 'Expand',
+    collapseCue: 'Collapse',
   },
   ar: {
     brand: 'Narrate',
@@ -140,6 +143,9 @@ const dict = {
     overlapWarning:
       'صوت سابق ما زال يغطي هذا الوقت (حتى {time}). انقل البداية لاحقًا حتى يكتمل التعليق السابق.',
     overlapToast: 'هذه الترجمة تتداخل مع صوت سابق — عدّل وقت البداية.',
+    emptyCuePreview: 'ترجمة فارغة',
+    expandCue: 'توسيع',
+    collapseCue: 'طي',
   },
 } as const
 

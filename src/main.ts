@@ -39,6 +39,7 @@ let toastTimer = 0
 let deferredPrompt: BeforeInstallPromptEvent | null = null
 let stopDictation: (() => void) | null = null
 let listeningCueId: string | null = null
+let expandedCueId: string | null = null
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -85,6 +86,7 @@ function setVideoFile(file: File) {
   if (videoUrl) URL.revokeObjectURL(videoUrl)
   cues.forEach(revokeCueAudio)
   cues = []
+  expandedCueId = null
   stopNarration()
   unbindNarrationSync()
   disposePlayer()
@@ -134,10 +136,12 @@ function addCueAtCurrent() {
     },
   ].sort((a, b) => a.start - b.start)
 
+  expandedCueId = id
   refreshCues()
   updateMarkers(cues)
   window.requestAnimationFrame(() => {
     document.querySelector<HTMLTextAreaElement>(`textarea[data-cue="${id}"]`)?.focus()
+    document.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   })
 }
 
@@ -179,6 +183,9 @@ function removeCue(id: string) {
   const cue = cues.find((c) => c.id === id)
   if (cue) revokeCueAudio(cue)
   cues = cues.filter((c) => c.id !== id)
+  if (expandedCueId === id) {
+    expandedCueId = cues.length ? cues[cues.length - 1]!.id : null
+  }
   refreshCues()
   updateMarkers(cues)
 }
@@ -475,17 +482,44 @@ function cuesHtml(): string {
     return `<div class="rounded-lg border border-dashed border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-10 text-center text-sm text-[var(--app-muted)]">${t(lang, 'emptyCues')}</div>`
   }
 
+  if (expandedCueId && !cues.some((c) => c.id === expandedCueId)) {
+    expandedCueId = cues[cues.length - 1]?.id ?? null
+  }
+
   return cues
     .map((c) => {
       const listening = listeningCueId === c.id
+      const expanded = expandedCueId === c.id
+      const preview = c.text.trim() || t(lang, 'emptyCuePreview')
       const durationNote =
         typeof c.audioDuration === 'number' && c.audioDuration > 0
           ? `<p class="text-[11px] text-[var(--app-muted)]">${t(lang, 'audioDurationLabel')}: ${formatClock(c.audioDuration)}</p>`
           : ''
+      const playBtn = c.audioUrl
+        ? `<button type="button" data-action="play-audio" title="${t(lang, 'playAudio')}" class="btn btn-icon btn-success shrink-0" aria-label="${t(lang, 'playAudio')}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+              <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14Z"/>
+            </svg>
+          </button>`
+        : ''
+
       return `
-      <article class="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] p-3" data-id="${c.id}">
+      <article class="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] ${expanded ? 'p-3' : 'p-2'}" data-id="${c.id}" data-expanded="${expanded ? 'true' : 'false'}">
+        <div class="flex items-center gap-1.5">
+          <button type="button" data-action="toggle-expand" title="${expanded ? t(lang, 'collapseCue') : t(lang, 'expandCue')}" class="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-start hover:bg-[var(--app-surface-2)]">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5 shrink-0 text-[var(--app-muted)] transition-transform ${expanded ? 'rotate-90' : ''}" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+            <span class="shrink-0 font-mono text-[11px] text-[var(--app-muted)]">${formatClock(c.start)}</span>
+            <span data-cue-preview class="min-w-0 flex-1 truncate text-xs ${c.text.trim() ? 'text-[var(--app-text)]' : 'text-[var(--app-muted)]'}">${escapeHtml(preview)}</span>
+          </button>
+          ${playBtn}
+        </div>
+        ${
+          expanded
+            ? `
         ${overlapWarningHtml(c)}
-        <div class="mb-3 flex flex-col gap-2">
+        <div class="mt-3 mb-3 flex flex-col gap-2">
           <div class="flex gap-2">
             <label class="flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-medium text-[var(--app-muted)]">
               ${t(lang, 'start')}
@@ -551,7 +585,9 @@ function cuesHtml(): string {
               ).join('')}
             </div>
           </div>
-        </div>
+        </div>`
+            : ''
+        }
       </article>`
     })
     .join('')
@@ -573,6 +609,13 @@ function bindCueEvents(list: HTMLElement) {
         const field = input.dataset.field
         if (field === 'text') {
           updateCue(id, { text: input.value })
+          const previewEl = card.querySelector<HTMLElement>('[data-cue-preview]')
+          if (previewEl) {
+            const trimmed = input.value.trim()
+            previewEl.textContent = trimmed || t(lang, 'emptyCuePreview')
+            previewEl.classList.toggle('text-[var(--app-muted)]', !trimmed)
+            previewEl.classList.toggle('text-[var(--app-text)]', Boolean(trimmed))
+          }
           return
         }
         const parsed = parseTimeInput(input.value)
@@ -598,6 +641,24 @@ function bindCueEvents(list: HTMLElement) {
       })
     })
 
+    card.querySelector('[data-action="toggle-expand"]')?.addEventListener('click', () => {
+      expandedCueId = expandedCueId === id ? null : id
+      refreshCues()
+      if (expandedCueId === id) {
+        window.requestAnimationFrame(() => {
+          document.querySelector<HTMLTextAreaElement>(`textarea[data-cue="${id}"]`)?.focus()
+        })
+      }
+    })
+    card.querySelectorAll<HTMLButtonElement>('[data-action="play-audio"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        const cue = cues.find((c) => c.id === id)
+        if (!cue?.audioUrl) return
+        const preview = new Audio(cue.audioUrl)
+        void preview.play()
+      })
+    })
     card.querySelectorAll<HTMLButtonElement>('[data-action="insert-tag"]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const tag = btn.dataset.tag
@@ -637,12 +698,6 @@ function bindCueEvents(list: HTMLElement) {
     card.querySelector('[data-action="seek"]')?.addEventListener('click', () => {
       const cue = cues.find((c) => c.id === id)
       if (cue) seekAndPlay(cue.start)
-    })
-    card.querySelector('[data-action="play-audio"]')?.addEventListener('click', () => {
-      const cue = cues.find((c) => c.id === id)
-      if (!cue?.audioUrl) return
-      const preview = new Audio(cue.audioUrl)
-      void preview.play()
     })
   })
 }
