@@ -1,3 +1,5 @@
+import type { Lang } from './types'
+
 /** Audio tags supported by ElevenLabs eleven_v3 model. */
 export const AUDIO_TAGS = [
   '[laughs]',
@@ -15,6 +17,29 @@ export const AUDIO_TAGS = [
   '[sarcastically]',
   '[pause]',
 ] as const
+
+export type AudioTag = (typeof AUDIO_TAGS)[number]
+
+const AUDIO_TAG_LABELS: Record<AudioTag, Record<Lang, string>> = {
+  '[laughs]': { en: 'Laughs', ar: 'ضحك' },
+  '[sighs]': { en: 'Sighs', ar: 'تنهيدة' },
+  '[whispers]': { en: 'Whispers', ar: 'همس' },
+  '[shouts]': { en: 'Shouts', ar: 'صراخ' },
+  '[clears throat]': { en: 'Clears throat', ar: 'تنحنح' },
+  '[curious]': { en: 'Curious', ar: 'فضول' },
+  '[excited]': { en: 'Excited', ar: 'حماس' },
+  '[sad]': { en: 'Sad', ar: 'حزن' },
+  '[angry]': { en: 'Angry', ar: 'غضب' },
+  '[happily]': { en: 'Happily', ar: 'سعادة' },
+  '[crying]': { en: 'Crying', ar: 'بكاء' },
+  '[tired]': { en: 'Tired', ar: 'تعب' },
+  '[sarcastically]': { en: 'Sarcastic', ar: 'سخرية' },
+  '[pause]': { en: 'Pause', ar: 'وقفة' },
+}
+
+export function audioTagLabel(tag: AudioTag, lang: Lang): string {
+  return AUDIO_TAG_LABELS[tag][lang]
+}
 
 export function modelSupportsAudioTags(modelId: string): boolean {
   return modelId.trim().toLowerCase().startsWith('eleven_v3')

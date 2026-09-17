@@ -13,6 +13,8 @@ export interface Cue {
   text: string
   audioBlob?: Blob
   audioUrl?: string
+  /** Measured length of generated audio in seconds. */
+  audioDuration?: number
   generating?: boolean
 }
 

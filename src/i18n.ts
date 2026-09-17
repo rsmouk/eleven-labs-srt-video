@@ -66,6 +66,10 @@ const dict = {
     usingFallbackVoices: 'Using default free voices (API key lacks voices_read).',
     audioTags: 'Audio tags (eleven_v3)',
     audioTagsHint: 'Requires model eleven_v3. Click a tag to insert it.',
+    audioDurationLabel: 'Audio length',
+    overlapWarning:
+      'Previous audio still covers this time (until {time}). Move the start later so the previous line can finish.',
+    overlapToast: 'This caption overlaps earlier audio — adjust the start time.',
   },
   ar: {
     brand: 'Narrate',
@@ -132,6 +136,10 @@ const dict = {
     usingFallbackVoices: 'تم استخدام الأصوات المجانية الافتراضية (المفتاح بلا voices_read).',
     audioTags: 'وسوم صوتية (eleven_v3)',
     audioTagsHint: 'تتطلب النموذج eleven_v3. اضغط وسمًا لإضافته.',
+    audioDurationLabel: 'مدة الصوت',
+    overlapWarning:
+      'صوت سابق ما زال يغطي هذا الوقت (حتى {time}). انقل البداية لاحقًا حتى يكتمل التعليق السابق.',
+    overlapToast: 'هذه الترجمة تتداخل مع صوت سابق — عدّل وقت البداية.',
   },
 } as const
 

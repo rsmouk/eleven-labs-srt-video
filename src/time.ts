@@ -67,6 +67,61 @@ export function cuesToSrt(cues: Cue[]): string {
     .join('\n')
 }
 
+/** End of the spoken coverage window (prefers measured audio duration). */
+export function cueCoverageEnd(cue: Cue): number {
+  if (typeof cue.audioDuration === 'number' && cue.audioDuration > 0) {
+    return cue.start + cue.audioDuration
+  }
+  return Math.max(cue.end, cue.start + 0.05)
+}
+
+export function cuesTimeOverlap(a: Cue, b: Cue): boolean {
+  return a.start < cueCoverageEnd(b) && b.start < cueCoverageEnd(a)
+}
+
+/** Earlier cue whose audio still covers this cue's start time. */
+export function findCoveringCue(cue: Cue, all: Cue[]): Cue | undefined {
+  return all
+    .filter(
+      (other) =>
+        other.id !== cue.id &&
+        Boolean(other.audioUrl) &&
+        other.start <= cue.start &&
+        cueCoverageEnd(other) > cue.start + 0.01,
+    )
+    .sort((a, b) => b.start - a.start)[0]
+}
+
+export function measureAudioDuration(url: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio()
+    audio.preload = 'metadata'
+    const cleanup = () => {
+      audio.removeAttribute('src')
+      audio.load()
+    }
+    audio.addEventListener(
+      'loadedmetadata',
+      () => {
+        const d = audio.duration
+        cleanup()
+        if (Number.isFinite(d) && d > 0) resolve(d)
+        else reject(new Error('Invalid audio duration'))
+      },
+      { once: true },
+    )
+    audio.addEventListener(
+      'error',
+      () => {
+        cleanup()
+        reject(new Error('Failed to read audio duration'))
+      },
+      { once: true },
+    )
+    audio.src = url
+  })
+}
+
 export function uid(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 }

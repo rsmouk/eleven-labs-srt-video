@@ -1,5 +1,6 @@
 import type Player from 'video.js/dist/types/player'
 import type { Cue } from './types'
+import { cueCoverageEnd } from './time'
 
 let player: Player | null = null
 let getCues: () => Cue[] = () => []
@@ -39,16 +40,10 @@ function cuesWithAudio(): Cue[] {
     .sort((a, b) => a.start - b.start)
 }
 
-function findActiveCue(time: number): Cue | undefined {
-  // Prefer cue whose window contains current time
-  const inWindow = cuesWithAudio().find((c) => time >= c.start && time < Math.max(c.end, c.start + 0.05))
-  if (inWindow) return inWindow
-
-  // If audio outlasts end, keep it active while still playing
-  if (activeCueId && narration && !narration.paused && !narration.ended) {
-    return cuesWithAudio().find((c) => c.id === activeCueId)
-  }
-  return undefined
+/** Prefer the earliest-starting cue that covers this time (no mid-sentence cutoffs). */
+function findCueAtTime(time: number): Cue | undefined {
+  const matches = cuesWithAudio().filter((c) => time >= c.start && time < cueCoverageEnd(c))
+  return matches[0]
 }
 
 function onTimeUpdate(): void {
@@ -59,10 +54,7 @@ function onTimeUpdate(): void {
 function onPlay(): void {
   if (!player) return
   const time = player.currentTime() ?? 0
-  const cue = findActiveCue(time)
-  if (!cue?.audioUrl) return
-
-  if (activeCueId === cue.id && narration) {
+  if (activeCueId && narration && !narration.ended) {
     void narration.play().catch(() => undefined)
     return
   }
@@ -76,34 +68,24 @@ function onPause(): void {
 function onSeeking(): void {
   if (!player) return
   const time = player.currentTime() ?? 0
-  const cue = findActiveCue(time)
-
-  if (!cue?.audioUrl) {
-    stopNarration()
-    return
-  }
-
-  if (activeCueId === cue.id && narration) {
-    const offset = Math.max(0, time - cue.start)
-    if (Number.isFinite(narration.duration) && offset < narration.duration) {
-      narration.currentTime = offset
-    }
-    if (!player.paused()) void narration.play().catch(() => undefined)
-    else narration.pause()
-    return
-  }
-
+  // Seeking always re-evaluates — stop current and sync to new position
+  stopNarration()
   if (!player.paused()) syncToTime(time)
-  else stopNarration()
 }
 
 function syncToTime(time: number): void {
-  const cue = cuesWithAudio().find((c) => time >= c.start && time < Math.max(c.end, c.start + 0.05))
+  // Let the current narration finish so later overlapping cues don't cut it off
+  if (activeCueId && narration && !narration.paused && !narration.ended) {
+    const active = cuesWithAudio().find((c) => c.id === activeCueId)
+    if (active && time >= active.start - 0.05) return
+  }
+
+  const cue = findCueAtTime(time)
 
   if (!cue?.audioUrl) {
-    // Allow current narration to finish if we already started it at cue.start
-    if (activeCueId && narration && !narration.paused && !narration.ended) return
-    stopNarration()
+    if (!(activeCueId && narration && !narration.paused && !narration.ended)) {
+      stopNarration()
+    }
     return
   }
 
@@ -127,8 +109,11 @@ function playCue(cue: Cue, offsetSeconds: number): void {
 
   const startAt = () => {
     if (!narration) return
-    if (offsetSeconds > 0.05 && Number.isFinite(narration.duration)) {
-      narration.currentTime = Math.min(offsetSeconds, Math.max(0, narration.duration - 0.05))
+    const duration = Number.isFinite(narration.duration)
+      ? narration.duration
+      : cue.audioDuration ?? Number.POSITIVE_INFINITY
+    if (offsetSeconds > 0.05 && Number.isFinite(duration)) {
+      narration.currentTime = Math.min(offsetSeconds, Math.max(0, duration - 0.05))
     }
     if (player && !player.paused()) {
       void narration.play().catch(() => undefined)
@@ -142,12 +127,15 @@ function playCue(cue: Cue, offsetSeconds: number): void {
       if (activeCueId === cue.id) {
         activeCueId = null
         narration = null
+        // Pick up the next cue if video time is already inside its window
+        if (player && !player.paused()) {
+          syncToTime(player.currentTime() ?? 0)
+        }
       }
     },
     { once: true },
   )
 
-  // If metadata already cached
   if (narration.readyState >= 1) startAt()
 }
 
