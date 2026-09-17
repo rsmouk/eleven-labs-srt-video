@@ -167,7 +167,27 @@ function overlapWarningHtml(cue: Cue): string {
   if (!covering) return ''
   const until = formatClock(cueCoverageEnd(covering))
   const msg = t(lang, 'overlapWarning').replace('{time}', until)
-  return `<div class="mb-2 rounded-md border border-[#5c4a1f] bg-[#2a2210] px-2.5 py-1.5 text-[11px] leading-snug text-[#e8d48b]">${escapeHtml(msg)}</div>`
+  return `<div class="mb-2 flex items-center gap-2 rounded-md border border-[#5c4a1f] bg-[#2a2210] px-2.5 py-1.5 text-[11px] leading-snug text-[#e8d48b]">
+    <span class="min-w-0 flex-1">${escapeHtml(msg)}</span>
+    <button type="button" data-action="shift-after-overlap" class="btn btn-sm btn-warn shrink-0 h-6 px-2">${t(lang, 'shiftAfterOverlap')}</button>
+  </div>`
+}
+
+function shiftCueAfterOverlap(id: string) {
+  const cue = cues.find((c) => c.id === id)
+  if (!cue) return
+  const covering = findCoveringCue(cue, cues)
+  if (!covering) return
+
+  const videoDuration = getDuration()
+  let start = cueCoverageEnd(covering) + 0.05
+  if (videoDuration > 0) start = Math.min(start, Math.max(0, videoDuration - 0.1))
+
+  updateCue(id, { start })
+  cues = [...cues].sort((a, b) => a.start - b.start)
+  updateMarkers(cues)
+  refreshCues()
+  showToast(t(lang, 'shiftedAfterOverlap'))
 }
 
 function cueConflicts(cue: Cue): boolean {
@@ -649,6 +669,9 @@ function bindCueEvents(list: HTMLElement) {
           document.querySelector<HTMLTextAreaElement>(`textarea[data-cue="${id}"]`)?.focus()
         })
       }
+    })
+    card.querySelector('[data-action="shift-after-overlap"]')?.addEventListener('click', () => {
+      shiftCueAfterOverlap(id)
     })
     card.querySelectorAll<HTMLButtonElement>('[data-action="play-audio"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
