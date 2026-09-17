@@ -417,51 +417,53 @@ async function installPwa() {
 
 function cuesHtml(): string {
   if (!cues.length) {
-    return `<div class="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-500">${t(lang, 'emptyCues')}</div>`
+    return `<div class="rounded-lg border border-dashed border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-10 text-center text-sm text-[var(--app-muted)]">${t(lang, 'emptyCues')}</div>`
   }
 
   return cues
     .map((c) => {
       const listening = listeningCueId === c.id
       return `
-      <article class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm" data-id="${c.id}">
-        <div class="mb-3 flex flex-wrap items-end gap-3">
-          <label class="flex min-w-[7rem] flex-1 flex-col gap-1 text-xs font-medium text-slate-600">
-            ${t(lang, 'start')}
-            <input data-field="start" value="${formatClock(c.start)}" class="rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-          </label>
-          <label class="flex min-w-[7rem] flex-1 flex-col gap-1 text-xs font-medium text-slate-600">
-            ${t(lang, 'end')}
-            <input data-field="end" value="${formatClock(c.end)}" class="rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-          </label>
-          <div class="flex flex-wrap gap-2">
-            <button type="button" data-action="seek" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">${formatClock(c.start)}</button>
-            <button type="button" data-action="set-start-now" title="${t(lang, 'setStartNow')}" class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100">${t(lang, 'setStartNow')}</button>
-            <button type="button" data-action="generate" class="rounded-md bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50" ${c.generating ? 'disabled' : ''}>
+      <article class="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] p-3" data-id="${c.id}">
+        <div class="mb-3 flex flex-col gap-2">
+          <div class="flex gap-2">
+            <label class="flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-medium text-[var(--app-muted)]">
+              ${t(lang, 'start')}
+              <input data-field="start" value="${formatClock(c.start)}" class="field py-1.5 text-xs" />
+            </label>
+            <label class="flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-medium text-[var(--app-muted)]">
+              ${t(lang, 'end')}
+              <input data-field="end" value="${formatClock(c.end)}" class="field py-1.5 text-xs" />
+            </label>
+          </div>
+          <div class="toolbar-row">
+            <button type="button" data-action="seek" class="btn btn-sm">${formatClock(c.start)}</button>
+            <button type="button" data-action="set-start-now" title="${t(lang, 'setStartNow')}" class="btn btn-sm btn-warn">${t(lang, 'setStartNow')}</button>
+            <button type="button" data-action="generate" class="btn btn-sm btn-primary" ${c.generating ? 'disabled' : ''}>
               ${c.generating ? t(lang, 'generating') : t(lang, 'generate')}
             </button>
             ${
               c.audioUrl
-                ? `<button type="button" data-action="play-audio" class="rounded-md bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700">${t(lang, 'playAudio')}</button>`
+                ? `<button type="button" data-action="play-audio" class="btn btn-sm btn-success">${t(lang, 'playAudio')}</button>`
                 : ''
             }
-            <button type="button" data-action="delete" class="rounded-md px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50">${t(lang, 'delete')}</button>
+            <button type="button" data-action="delete" class="btn btn-sm btn-danger">${t(lang, 'delete')}</button>
           </div>
         </div>
 
         <div class="flex flex-col gap-1">
-          <span class="text-xs font-medium text-slate-600">${t(lang, 'text')}</span>
-          <div class="flex items-start gap-2">
-            <textarea data-cue="${c.id}" data-field="text" rows="4" placeholder="${t(lang, 'cuePlaceholder')}" class="min-w-0 flex-1 resize-y rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">${escapeHtml(c.text)}</textarea>
-            <div class="flex shrink-0 flex-col gap-2">
+          <span class="text-[11px] font-medium text-[var(--app-muted)]">${t(lang, 'text')}</span>
+          <div class="flex items-start gap-1.5">
+            <textarea data-cue="${c.id}" data-field="text" rows="3" placeholder="${t(lang, 'cuePlaceholder')}" class="field min-w-0 flex-1 resize-y text-xs">${escapeHtml(c.text)}</textarea>
+            <div class="flex shrink-0 flex-col gap-1.5">
               <button
                 type="button"
                 data-action="dictate"
                 title="${t(lang, 'voiceInput')}"
-                class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 ${listening ? 'listening' : ''}"
+                class="btn btn-icon ${listening ? 'listening' : ''}"
                 aria-pressed="${listening ? 'true' : 'false'}"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
                   <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 0-2 0 3 3 0 1 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V18H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 11Z"/>
                 </svg>
                 <span class="sr-only">${listening ? t(lang, 'voiceListening') : t(lang, 'voiceInput')}</span>
@@ -470,9 +472,9 @@ function cuesHtml(): string {
                 type="button"
                 data-action="clear-text"
                 title="${t(lang, 'clearText')}"
-                class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 hover:bg-red-50 hover:text-red-600"
+                class="btn btn-icon btn-danger"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 12a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-12M10 11v6M14 11v6"/>
                 </svg>
                 <span class="sr-only">${t(lang, 'clearText')}</span>
@@ -480,11 +482,11 @@ function cuesHtml(): string {
             </div>
           </div>
           <div class="mt-2">
-            <p class="mb-1.5 text-[11px] font-medium text-slate-500">${t(lang, 'audioTags')} — ${t(lang, 'audioTagsHint')}</p>
-            <div class="flex flex-wrap gap-1.5">
+            <p class="mb-1.5 text-[11px] font-medium text-[var(--app-muted)]">${t(lang, 'audioTags')} — ${t(lang, 'audioTagsHint')}</p>
+            <div class="flex flex-wrap gap-1">
               ${AUDIO_TAGS.map(
                 (tag) =>
-                  `<button type="button" data-action="insert-tag" data-tag="${escapeHtml(tag)}" class="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-800 hover:bg-violet-100">${escapeHtml(tag)}</button>`,
+                  `<button type="button" data-action="insert-tag" data-tag="${escapeHtml(tag)}" class="tag-chip">${escapeHtml(tag)}</button>`,
               ).join('')}
             </div>
           </div>
@@ -650,110 +652,110 @@ function renderShell() {
   applyDir()
   root.innerHTML = `
     <div class="min-h-dvh">
-      <header class="border-b border-slate-200 bg-white">
-        <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <header class="border-b border-[var(--app-border)] bg-[var(--app-surface)]">
+        <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
           <div class="min-w-0">
-            <p id="txt-brand" class="text-lg font-semibold tracking-tight text-slate-900">${t(lang, 'brand')}</p>
-            <p id="txt-tagline" class="truncate text-sm text-slate-500">${t(lang, 'tagline')}</p>
+            <p id="txt-brand" class="text-base font-semibold tracking-tight text-[var(--app-text)]">${t(lang, 'brand')}</p>
+            <p id="txt-tagline" class="truncate text-xs text-[var(--app-muted)]">${t(lang, 'tagline')}</p>
           </div>
-          <div class="flex shrink-0 items-center gap-2">
-            <button type="button" id="btn-install" class="hidden rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:inline-flex">${t(lang, 'installPwa')}</button>
-            <button type="button" id="btn-lang" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'lang')}</button>
-            <button type="button" id="btn-settings" class="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">${t(lang, 'settings')}</button>
+          <div class="toolbar-row shrink-0">
+            <button type="button" id="btn-install" class="btn hidden sm:inline-flex">${t(lang, 'installPwa')}</button>
+            <button type="button" id="btn-lang" class="btn">${t(lang, 'lang')}</button>
+            <button type="button" id="btn-settings" class="btn btn-primary">${t(lang, 'settings')}</button>
           </div>
         </div>
       </header>
 
-      <main class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:py-6">
-        <section id="upload-panel" class="${videoUrl ? 'hidden' : ''} rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-sm">
-          <h1 id="txt-upload-title" class="text-2xl font-semibold text-slate-900">${t(lang, 'uploadTitle')}</h1>
-          <p id="txt-upload-hint" class="mx-auto mt-2 max-w-lg text-sm text-slate-500">${t(lang, 'uploadHint')}</p>
-          <label class="mt-6 inline-flex cursor-pointer items-center rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700">
+      <main class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:py-5">
+        <section id="upload-panel" class="${videoUrl ? 'hidden' : ''} rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-16 text-center">
+          <h1 id="txt-upload-title" class="text-2xl font-semibold text-[var(--app-text)]">${t(lang, 'uploadTitle')}</h1>
+          <p id="txt-upload-hint" class="mx-auto mt-2 max-w-lg text-sm text-[var(--app-muted)]">${t(lang, 'uploadHint')}</p>
+          <label class="btn btn-primary mt-6 h-9 cursor-pointer px-4 text-sm">
             <span id="txt-choose">${t(lang, 'chooseVideo')}</span>
             <input id="file-input-upload" type="file" accept="video/*" class="hidden" />
           </label>
         </section>
 
         <section id="workspace" class="${videoUrl ? '' : 'hidden'}">
-          <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 lg:items-start">
-            <div id="video-panel" class="space-y-2 border-b border-slate-200 pb-2 lg:border-b-0 lg:pb-0">
-              <div id="player-host" class="overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-sm"></div>
+          <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5 lg:items-start">
+            <div id="video-panel" class="space-y-2 border-b border-[var(--app-border)] pb-3 lg:border-b-0 lg:pb-0">
+              <div id="player-host" class="overflow-hidden rounded-lg border border-[var(--app-border)] bg-black"></div>
 
-              <div id="workspace-toolbar" class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+              <div id="workspace-toolbar" class="toolbar-row rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] p-1.5">
                 <label id="btn-change-wrap" title="${t(lang, 'changeVideo')}" class="toolbar-icon-btn cursor-pointer">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14M4 8h8a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4a2 2 0 012-2z"/>
                   </svg>
-                  <span id="txt-change" class="hidden text-sm font-medium lg:inline">${t(lang, 'changeVideo')}</span>
+                  <span id="txt-change" class="hidden sm:inline">${t(lang, 'changeVideo')}</span>
                   <input id="file-input-change" type="file" accept="video/*" class="hidden" />
                 </label>
 
                 <button type="button" id="btn-add-cue" title="${t(lang, 'addCue')}" class="toolbar-icon-btn-primary">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
                   </svg>
-                  <span id="txt-add-cue" class="hidden text-sm font-medium lg:inline">${t(lang, 'addCue')}</span>
+                  <span id="txt-add-cue" class="hidden sm:inline">${t(lang, 'addCue')}</span>
                 </button>
 
                 <button type="button" id="btn-gen-all" title="${t(lang, 'generateAll')}" class="toolbar-icon-btn">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V9l12-2v10M9 19c0 1.1-1.3 2-3 2s-3-.9-3-2 1.3-2 3-2 3 .9 3 2zm12-2c0 1.1-1.3 2-3 2s-3-.9-3-2 1.3-2 3-2 3 .9 3 2z"/>
                   </svg>
-                  <span id="txt-gen-all" class="hidden text-sm font-medium lg:inline">${t(lang, 'generateAll')}</span>
+                  <span id="txt-gen-all" class="hidden sm:inline">${t(lang, 'generateAll')}</span>
                 </button>
 
                 <button type="button" id="btn-dl-srt" title="${t(lang, 'downloadSrt')}" class="toolbar-icon-btn">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M7 4h7l3 3v13a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z"/>
                   </svg>
-                  <span id="txt-dl-srt" class="hidden text-sm font-medium lg:inline">${t(lang, 'downloadSrt')}</span>
+                  <span id="txt-dl-srt" class="hidden sm:inline">${t(lang, 'downloadSrt')}</span>
                 </button>
 
                 <button type="button" id="btn-dl-audio" title="${t(lang, 'downloadAudio')}" class="toolbar-icon-btn">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 shrink-0" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4"/>
                   </svg>
-                  <span id="txt-dl-audio" class="hidden text-sm font-medium lg:inline">${t(lang, 'downloadAudio')}</span>
+                  <span id="txt-dl-audio" class="hidden sm:inline">${t(lang, 'downloadAudio')}</span>
                 </button>
               </div>
 
-              <p id="txt-time-hint" class="hidden text-xs text-slate-500 lg:block">${t(lang, 'timeHint')}</p>
+              <p id="txt-time-hint" class="hidden text-xs text-[var(--app-muted)] lg:block">${t(lang, 'timeHint')}</p>
             </div>
 
             <div class="min-w-0">
-              <h2 id="txt-cues-title" class="mb-3 text-lg font-semibold text-slate-900">${t(lang, 'cues')}</h2>
-              <div id="cues-list" class="space-y-3 pb-8"></div>
+              <h2 id="txt-cues-title" class="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--app-muted)]">${t(lang, 'cues')}</h2>
+              <div id="cues-list" class="space-y-2.5 pb-8"></div>
             </div>
           </div>
         </section>
       </main>
 
       <div id="settings-modal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
-        <div id="settings-backdrop" class="absolute inset-0 bg-slate-900/40"></div>
-        <div class="relative mx-auto mt-[12vh] max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
-          <h2 id="txt-settings-title" class="text-lg font-semibold text-slate-900">${t(lang, 'settingsTitle')}</h2>
-          <p id="txt-settings-hint" class="mt-1 text-sm text-slate-500">${t(lang, 'settingsHint')}</p>
-          <form id="settings-form" class="mt-5 space-y-4">
-            <label class="block text-sm font-medium text-slate-700">
+        <div id="settings-backdrop" class="absolute inset-0 bg-black/60"></div>
+        <div class="relative mx-auto mt-[12vh] max-w-md rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5">
+          <h2 id="txt-settings-title" class="text-base font-semibold text-[var(--app-text)]">${t(lang, 'settingsTitle')}</h2>
+          <p id="txt-settings-hint" class="mt-1 text-sm text-[var(--app-muted)]">${t(lang, 'settingsHint')}</p>
+          <form id="settings-form" class="mt-4 space-y-3.5">
+            <label class="block text-xs font-medium text-[var(--app-muted)]">
               <span id="lbl-api">${t(lang, 'apiKey')}</span>
-              <input id="set-api" type="password" autocomplete="off" value="${escapeHtml(settings.apiKey)}" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              <input id="set-api" type="password" autocomplete="off" value="${escapeHtml(settings.apiKey)}" class="field mt-1" />
             </label>
-            <label class="block text-sm font-medium text-slate-700">
+            <label class="block text-xs font-medium text-[var(--app-muted)]">
               <span id="lbl-voice">${t(lang, 'voiceId')}</span>
-              <select id="set-voice" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <select id="set-voice" class="field mt-1">
                 ${voiceSelectHtml(settings.voiceId)}
               </select>
             </label>
-            <label class="block text-sm font-medium text-slate-700">
+            <label class="block text-xs font-medium text-[var(--app-muted)]">
               <span id="lbl-voice-custom">${t(lang, 'customVoiceId')}</span>
-              <input id="set-voice-custom" type="text" value="" autocomplete="off" placeholder="TX3LPaxmHKxFdv7VOQHJ" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              <input id="set-voice-custom" type="text" value="" autocomplete="off" placeholder="TX3LPaxmHKxFdv7VOQHJ" class="field mt-1" />
             </label>
-            <p id="txt-voices-hint" class="text-xs text-slate-500">${t(lang, 'voicesHint')}</p>
-            <p id="txt-voices-permission" class="text-xs text-amber-700">${t(lang, 'voicesReadPermission')}</p>
-            <button type="button" id="btn-load-voices" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'loadVoices')}</button>
-            <label class="block text-sm font-medium text-slate-700">
+            <p id="txt-voices-hint" class="text-xs text-[var(--app-muted)]">${t(lang, 'voicesHint')}</p>
+            <p id="txt-voices-permission" class="text-xs text-[#e8d48b]">${t(lang, 'voicesReadPermission')}</p>
+            <button type="button" id="btn-load-voices" class="btn">${t(lang, 'loadVoices')}</button>
+            <label class="block text-xs font-medium text-[var(--app-muted)]">
               <span id="lbl-model">${t(lang, 'modelId')}</span>
-              <select id="set-model" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <select id="set-model" class="field mt-1">
                 <option value="eleven_v3" ${settings.modelId === 'eleven_v3' ? 'selected' : ''}>eleven_v3 (audio tags)</option>
                 <option value="eleven_multilingual_v2" ${settings.modelId === 'eleven_multilingual_v2' ? 'selected' : ''}>eleven_multilingual_v2</option>
                 <option value="eleven_turbo_v2_5" ${settings.modelId === 'eleven_turbo_v2_5' ? 'selected' : ''}>eleven_turbo_v2_5</option>
@@ -761,15 +763,15 @@ function renderShell() {
                 <option value="eleven_monolingual_v1" ${settings.modelId === 'eleven_monolingual_v1' ? 'selected' : ''}>eleven_monolingual_v1</option>
               </select>
             </label>
-            <div class="flex justify-end gap-2 pt-2">
-              <button type="button" id="btn-close-settings" class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">${t(lang, 'close')}</button>
-              <button type="submit" id="btn-save-settings" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">${t(lang, 'save')}</button>
+            <div class="toolbar-row justify-end pt-1">
+              <button type="button" id="btn-close-settings" class="btn">${t(lang, 'close')}</button>
+              <button type="submit" id="btn-save-settings" class="btn btn-primary">${t(lang, 'save')}</button>
             </div>
           </form>
         </div>
       </div>
 
-      <div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white opacity-0 shadow-lg transition-opacity duration-300"></div>
+      <div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-md border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-2 text-sm text-[var(--app-text)] opacity-0 transition-opacity duration-300"></div>
     </div>
   `
 
@@ -831,13 +833,13 @@ function bindShellEvents() {
     ;['dragenter', 'dragover'].forEach((ev) => {
       dropzone.addEventListener(ev, (e) => {
         e.preventDefault()
-        dropzone.classList.add('ring-2', 'ring-blue-500')
+        dropzone.classList.add('ring-1', 'ring-[var(--app-border-soft)]')
       })
     })
     ;['dragleave', 'drop'].forEach((ev) => {
       dropzone.addEventListener(ev, (e) => {
         e.preventDefault()
-        dropzone.classList.remove('ring-2', 'ring-blue-500')
+        dropzone.classList.remove('ring-1', 'ring-[var(--app-border-soft)]')
       })
     })
     dropzone.addEventListener('drop', (e) => {
