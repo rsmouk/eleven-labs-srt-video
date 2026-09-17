@@ -17,7 +17,7 @@ import { bindNarrationSync, stopNarration, unbindNarrationSync } from './narrati
 import { AUDIO_TAGS, audioTagLabel, insertAtCursor } from './audioTags'
 import { isSpeechSupported, startDictation } from './speech'
 import { loadLang, loadSettings, saveLang, saveSettings } from './storage'
-import { cuesToSrt, formatClock, formatFileTimestamp, parseTimeInput, uid } from './time'
+import { cuesToSrt, cueCoverageEnd, formatClock, formatFileTimestamp, findCoveringCue, measureAudioDuration, parseTimeInput, uid } from './time'
 import type { Cue, ElevenSettings, Lang } from './types'
 import {
   FALLBACK_FREE_VOICES,
@@ -142,7 +142,36 @@ function addCueAtCurrent() {
 }
 
 function updateCue(id: string, patch: Partial<Cue>) {
-  cues = cues.map((c) => (c.id === id ? { ...c, ...patch } : c))
+  cues = cues.map((c) => {
+    if (c.id !== id) return c
+    const next = { ...c, ...patch }
+    // Keep end aligned with measured audio when start moves
+    if (
+      typeof patch.start === 'number' &&
+      typeof next.audioDuration === 'number' &&
+      next.audioDuration > 0 &&
+      patch.end === undefined
+    ) {
+      next.end = next.start + next.audioDuration
+    }
+    return next
+  })
+}
+
+function overlapWarningHtml(cue: Cue): string {
+  const covering = findCoveringCue(cue, cues)
+  if (!covering) return ''
+  const until = formatClock(cueCoverageEnd(covering))
+  const msg = t(lang, 'overlapWarning').replace('{time}', until)
+  return `<div class="mb-2 rounded-md border border-[#5c4a1f] bg-[#2a2210] px-2.5 py-1.5 text-[11px] leading-snug text-[#e8d48b]">${escapeHtml(msg)}</div>`
+}
+
+function cueConflicts(cue: Cue): boolean {
+  if (findCoveringCue(cue, cues)) return true
+  if (!cue.audioUrl) return false
+  return cues.some(
+    (other) => other.id !== cue.id && other.start > cue.start && other.start < cueCoverageEnd(cue),
+  )
 }
 
 function removeCue(id: string) {
@@ -217,13 +246,39 @@ async function generateOne(id: string) {
     const current = cues.find((c) => c.id === id)
     if (current) revokeCueAudio(current)
     const audioUrl = URL.createObjectURL(blob)
-    updateCue(id, { generating: false, audioBlob: blob, audioUrl })
-    showToast(t(lang, 'doneAudio'))
+    let audioDuration = 0
+    try {
+      audioDuration = await measureAudioDuration(audioUrl)
+    } catch {
+      audioDuration = 0
+    }
+    const videoDuration = getDuration()
+    const end =
+      audioDuration > 0
+        ? Math.min(
+            cue.start + audioDuration,
+            videoDuration > 0 ? videoDuration : cue.start + audioDuration,
+          )
+        : cue.end
+    updateCue(id, {
+      generating: false,
+      audioBlob: blob,
+      audioUrl,
+      audioDuration: audioDuration > 0 ? audioDuration : undefined,
+      end: end > cue.start ? end : cue.start + 0.5,
+    })
+    const updated = cues.find((c) => c.id === id)
+    if (updated && cueConflicts(updated)) {
+      showToast(t(lang, 'overlapToast'))
+    } else {
+      showToast(t(lang, 'doneAudio'))
+    }
   } catch (err) {
     updateCue(id, { generating: false })
     showToast(`${t(lang, 'errorAudio')}: ${err instanceof Error ? err.message : String(err)}`)
   }
   refreshCues()
+  updateMarkers(cues)
 }
 
 async function generateAll() {
@@ -423,8 +478,13 @@ function cuesHtml(): string {
   return cues
     .map((c) => {
       const listening = listeningCueId === c.id
+      const durationNote =
+        typeof c.audioDuration === 'number' && c.audioDuration > 0
+          ? `<p class="text-[11px] text-[var(--app-muted)]">${t(lang, 'audioDurationLabel')}: ${formatClock(c.audioDuration)}</p>`
+          : ''
       return `
       <article class="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] p-3" data-id="${c.id}">
+        ${overlapWarningHtml(c)}
         <div class="mb-3 flex flex-col gap-2">
           <div class="flex gap-2">
             <label class="flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-medium text-[var(--app-muted)]">
@@ -436,6 +496,7 @@ function cuesHtml(): string {
               <input data-field="end" value="${formatClock(c.end)}" class="field py-1.5 text-xs" />
             </label>
           </div>
+          ${durationNote}
           <div class="toolbar-row">
             <button type="button" data-action="seek" class="btn btn-sm">${formatClock(c.start)}</button>
             <button type="button" data-action="set-start-now" title="${t(lang, 'setStartNow')}" class="btn btn-sm btn-warn">${t(lang, 'setStartNow')}</button>
@@ -519,8 +580,13 @@ function bindCueEvents(list: HTMLElement) {
         if (field === 'start') {
           updateCue(id, { start: parsed })
           updateMarkers(cues)
+          refreshCues()
+          return
         }
-        if (field === 'end') updateCue(id, { end: parsed })
+        if (field === 'end') {
+          updateCue(id, { end: parsed })
+          refreshCues()
+        }
       }
       input.addEventListener('change', commit)
       input.addEventListener('blur', () => {
@@ -547,8 +613,12 @@ function bindCueEvents(list: HTMLElement) {
       if (!getPlayer()) return
       const start = getCurrentTime()
       const cue = cues.find((c) => c.id === id)
-      const end = cue && cue.end > start ? cue.end : start + 3
-      updateCue(id, { start, end })
+      if (cue && typeof cue.audioDuration === 'number' && cue.audioDuration > 0) {
+        updateCue(id, { start })
+      } else {
+        const end = cue && cue.end > start ? cue.end : start + 3
+        updateCue(id, { start, end })
+      }
       cues = [...cues].sort((a, b) => a.start - b.start)
       updateMarkers(cues)
       refreshCues()
