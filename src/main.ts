@@ -14,7 +14,7 @@ import {
   updateMarkers,
 } from './player'
 import { bindNarrationSync, stopNarration, unbindNarrationSync } from './narration'
-import { AUDIO_TAGS, insertAtCursor } from './audioTags'
+import { AUDIO_TAGS, audioTagLabel, insertAtCursor } from './audioTags'
 import { isSpeechSupported, startDictation } from './speech'
 import { loadLang, loadSettings, saveLang, saveSettings } from './storage'
 import { cuesToSrt, formatClock, formatFileTimestamp, parseTimeInput, uid } from './time'
@@ -486,7 +486,7 @@ function cuesHtml(): string {
             <div class="flex flex-wrap gap-1">
               ${AUDIO_TAGS.map(
                 (tag) =>
-                  `<button type="button" data-action="insert-tag" data-tag="${escapeHtml(tag)}" class="tag-chip">${escapeHtml(tag)}</button>`,
+                  `<button type="button" data-action="insert-tag" data-tag="${escapeHtml(tag)}" title="${escapeHtml(tag)}" class="tag-chip">${escapeHtml(audioTagLabel(tag, lang))}</button>`,
               ).join('')}
             </div>
           </div>
